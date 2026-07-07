@@ -1,4 +1,4 @@
-from intake import collect_user_query
+from intake.intake import collect_user_query
 
 '''
 intake.py
