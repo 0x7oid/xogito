@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reasoning Framework v2 — Patched Architecture</title>
+<style>
+  :root{
+    --ink:#243038;
+    --line:#4a6274;
+    --paper:#f4f6f3;
+    --fix:#a34700;
+    --fixfill:#fdf1e3;
+    --kernel:#5d4a9c;
+    --kernelfill:#f2effa;
+    --muted:#6b7d8a;
+  }
+  body{
+    margin:0; padding:28px 20px 40px;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  header{max-width:1500px;margin:0 auto 14px;}
+  h1{
+    font-family:"Consolas","IBM Plex Mono",monospace;
+    font-size:21px; letter-spacing:.5px; margin:0 0 4px;
+  }
+  header p{margin:0;font-size:13px;color:var(--muted);}
+  .wrap{max-width:1500px;margin:0 auto;overflow-x:auto;background:white;
+        border:1px solid #d8dfd9;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+  svg{display:block;}
+  .legend{
+    max-width:1500px;margin:16px auto 0;background:white;border:1px solid #d8dfd9;
+    border-radius:10px;padding:16px 22px;
+  }
+  .legend h2{font-family:"Consolas",monospace;font-size:14px;margin:0 0 10px;letter-spacing:.5px;}
+  .legend ol{margin:0;padding-left:0;list-style:none;columns:2;column-gap:40px;font-size:12.5px;line-height:1.55;}
+  .legend li{margin-bottom:7px;break-inside:avoid;}
+  .legend b{color:var(--fix);font-family:"Consolas",monospace;}
+  .legend .k{color:var(--kernel);font-family:"Consolas",monospace;}
+
+  /* SVG classes */
+  .box{fill:#ffffff;stroke:var(--line);stroke-width:1.4;}
+  .fixbox{fill:var(--fixfill);stroke:var(--fix);stroke-width:1.6;}
+  .kernelbox{fill:var(--kernelfill);stroke:var(--kernel);stroke-width:1.5;stroke-dasharray:6 4;}
+  .title{font:600 12.5px "Consolas",monospace;fill:var(--ink);}
+  .fixtitle{font:600 12.5px "Consolas",monospace;fill:var(--fix);}
+  .ktitle{font:600 12.5px "Consolas",monospace;fill:var(--kernel);}
+  .body{font:10.8px "Segoe UI",Arial,sans-serif;fill:var(--ink);}
+  .fixline{font:10.8px "Segoe UI",Arial,sans-serif;fill:var(--fix);}
+  .kline{font:10.6px "Segoe UI",Arial,sans-serif;fill:#3f3370;}
+  .lbl{font:italic 10.5px "Segoe UI",Arial,sans-serif;fill:var(--muted);}
+  .edge{stroke:var(--line);stroke-width:1.5;fill:none;}
+  .kedge{stroke:var(--kernel);stroke-width:1.3;fill:none;stroke-dasharray:3 4;}
+  .badge{fill:var(--fix);}
+  .badgetext{font:700 9.5px "Consolas",monospace;fill:#fff;}
+  .diamond{fill:#ffffff;stroke:var(--line);stroke-width:1.4;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>REASONING FRAMEWORK v2 — patched architecture</h1>
+  <p>White boxes = original pipeline &nbsp;·&nbsp; orange = the nine fixes &nbsp;·&nbsp; dashed purple = Protected Kernel (code-enforced, not prompt-enforced)</p>
+</header>
+
+<div class="wrap">
+<svg viewBox="0 0 1500 1900" width="1500" height="1900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#4a6274"/>
+    </marker>
+    <marker id="karr" markerWidth="9" markerHeight="9" refX="7.5" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#5d4a9c"/>
+    </marker>
+  </defs>
+
+  <!-- ======================= PARSE + DECISION ======================= -->
+  <rect class="box" x="320" y="30" width="200" height="40" rx="9"/>
+  <text class="title" x="420" y="55" text-anchor="middle">Parse request</text>
+
+  <polygon class="diamond" points="420,105 535,143 420,181 305,143"/>
+  <text class="body" x="420" y="139" text-anchor="middle">Is the problem</text>
+  <text class="body" x="420" y="153" text-anchor="middle">formalizable?</text>
+
+  <rect class="box" x="55" y="113" width="185" height="60" rx="9"/>
+  <text class="title" x="147" y="135" text-anchor="middle">No</text>
+  <text class="body" x="147" y="151" text-anchor="middle">Ask clarification</text>
+  <text class="body" x="147" y="164" text-anchor="middle">or reformulate</text>
+
+  <path class="edge" d="M420,70 L420,105" marker-end="url(#arr)"/>
+  <path class="edge" d="M305,143 L240,143" marker-end="url(#arr)"/>
+  <text class="lbl" x="268" y="136">no</text>
+  <path class="edge" d="M147,113 L147,50 L320,50" marker-end="url(#arr)"/>
+  <path class="edge" d="M420,181 L420,215" marker-end="url(#arr)"/>
+  <text class="lbl" x="430" y="203">yes</text>
+
+  <!-- ======================= FORMALISATION ======================= -->
+  <rect class="box" x="260" y="215" width="320" height="172" rx="9"/>
+  <text class="title" x="420" y="235" text-anchor="middle">Formalisation</text>
+  <text class="body" x="276" y="254">Extract Goal · Define Scope (in / out)</text>
+  <text class="body" x="276" y="270">Extract Constraints · Assumptions</text>
+  <text class="body" x="276" y="286">Extract Success Criteria</text>
+  <text class="body" x="276" y="302">Load Policy Base → normalize to schema;</text>
+  <text class="body" x="276" y="316">illegal lines rejected, unmapped surfaced</text>
+  <text class="body" x="276" y="334">Contextual Anchors → near-verbatim, labeled</text>
+  <text class="body" x="276" y="352">Create Problem Specification</text>
+  <text class="lbl" x="276" y="372">one interpretation step, done once, here</text>
+
+  <!-- Ratification gate -->
+  <rect class="fixbox" x="260" y="405" width="320" height="62" rx="9"/>
+  <rect class="badge" x="516" y="397" width="56" height="16" rx="8"/>
+  <text class="badgetext" x="544" y="409" text-anchor="middle">GATE</text>
+  <text class="fixtitle" x="276" y="424">User Ratification Gate</text>
+  <text class="body" x="276" y="441">Spec echoed back; per-anchor confirm; rejected</text>
+  <text class="body" x="276" y="456">policy lines shown, never silently dropped</text>
+
+  <path class="edge" d="M420,387 L420,405" marker-end="url(#arr)"/>
+  <path class="edge" d="M420,467 L420,495" marker-end="url(#arr)"/>
+
+  <!-- ======================= INIT WORKSPACE ======================= -->
+  <rect class="box" x="260" y="495" width="320" height="104" rx="9"/>
+  <text class="title" x="420" y="515" text-anchor="middle">Initialize Workspace</text>
+  <text class="body" x="276" y="534">Empty Task Graph · Empty Artifacts</text>
+  <text class="body" x="276" y="550">Belief Ledger (typed, machine-checkable)</text>
+  <text class="body" x="276" y="566">Provenance + security log</text>
+  <text class="body" x="276" y="582">Carry-over Packet (structured)</text>
+
+  <path class="edge" d="M420,599 L420,630" marker-end="url(#arr)"/>
+
+  <!-- ======================= PLANNER ======================= -->
+  <rect class="box" x="260" y="630" width="320" height="148" rx="9"/>
+  <rect class="badge" x="516" y="622" width="56" height="16" rx="8"/>
+  <text class="badgetext" x="544" y="634" text-anchor="middle">FIX 8</text>
+  <text class="title" x="420" y="650" text-anchor="middle">Planner</text>
+  <text class="body" x="276" y="669">Goal atomic? → create task</text>
+  <text class="body" x="276" y="685">Else decompose → dependency graph</text>
+  <text class="body" x="276" y="701">Missing info → investigation task</text>
+  <text class="body" x="276" y="717">Contradiction → verification task</text>
+  <text class="fixline" x="276" y="737">Regress stopper: verification artifacts never</text>
+  <text class="fixline" x="276" y="751">spawn verification; at depth cap → forced</text>
+  <text class="fixline" x="276" y="765">Contested, never a silent loop</text>
+
+  <path class="edge" d="M420,778 L420,808" marker-end="url(#arr)"/>
+
+  <!-- ======================= SCHEDULER ======================= -->
+  <rect class="box" x="260" y="808" width="320" height="108" rx="9"/>
+  <text class="title" x="420" y="828" text-anchor="middle">Scheduler</text>
+  <text class="body" x="276" y="847">Dependencies satisfied? Collect ready tasks</text>
+  <text class="fixline" x="276" y="864">Sensitivity-weighted priority: claim fan-out</text>
+  <text class="fixline" x="276" y="878">from dependency graph decides who gets</text>
+  <text class="fixline" x="276" y="892">verification budget first</text>
+  <text class="body" x="276" y="908">Resource limits → queue or dispatch</text>
+
+  <path class="edge" d="M420,916 L420,946" marker-end="url(#arr)"/>
+
+  <!-- ======================= EXECUTOR POOL ======================= -->
+  <rect class="box" x="260" y="946" width="320" height="140" rx="9"/>
+  <rect class="badge" x="516" y="938" width="56" height="16" rx="8"/>
+  <text class="badgetext" x="544" y="950" text-anchor="middle">FIX 9</text>
+  <text class="title" x="420" y="966" text-anchor="middle">Executor Pool (per task)</text>
+  <text class="fixline" x="276" y="985">Read a SNAPSHOT of belief table + relevant</text>
+  <text class="fixline" x="276" y="999">artifacts (snapshot version recorded)</text>
+  <text class="body" x="276" y="1017">Execute reasoning · Produce artifact</text>
+  <text class="body" x="276" y="1033">Attach evidence + provenance</text>
+  <text class="body" x="276" y="1049">Assign initial belief (proposal only —</text>
+  <text class="body" x="276" y="1063">code owns the ledger) · Return artifact</text>
+
+  <!-- executor -> workspace -->
+  <path class="edge" d="M580,1016 L668,1016 L668,700 L758,700" marker-end="url(#arr)"/>
+  <text class="lbl" x="676" y="860">artifact +</text>
+  <text class="lbl" x="676" y="874">snapshot id</text>
+
+  <!-- ======================= WORKSPACE ======================= -->
+  <rect class="box" x="758" y="640" width="304" height="126" rx="9"/>
+  <rect class="badge" x="998" y="632" width="56" height="16" rx="8"/>
+  <text class="badgetext" x="1026" y="644" text-anchor="middle">FIX 9</text>
+  <text class="title" x="910" y="660" text-anchor="middle">Workspace (blackboard)</text>
+  <text class="body" x="774" y="679">Validate schema · Store artifact</text>
+  <text class="body" x="774" y="695">Link provenance · Update references</text>
+  <text class="fixline" x="774" y="714">Stale-premise invalidation: if a claim an</text>
+  <text class="fixline" x="774" y="728">artifact was built on gets demoted after its</text>
+  <text class="fixline" x="774" y="742">snapshot → artifact auto-queued for re-eval</text>
+  <text class="body" x="774" y="758">(v1 alternative: evaluate serially)</text>
+
+  <path class="edge" d="M910,766 L910,800" marker-end="url(#arr)"/>
+
+  <!-- ======================= EVALUATOR ======================= -->
+  <rect class="box" x="758" y="800" width="304" height="130" rx="9"/>
+  <text class="title" x="910" y="820" text-anchor="middle">Evaluator (per artifact)</text>
+  <text class="body" x="774" y="839">Check evidence · Detect contradictions</text>
+  <text class="body" x="774" y="855">and duplicates · Success criteria reached?</text>
+  <text class="body" x="774" y="873">Outputs a structured VERDICT PROPOSAL:</text>
+  <text class="body" x="774" y="887">ladder move + evidence IDs + evidence type</text>
+  <text class="lbl" x="774" y="907">proposes only — nothing it says mutates</text>
+  <text class="lbl" x="774" y="920">the ledger until the harness clears it</text>
+
+  <!-- evaluator -> harness -->
+  <path class="edge" d="M1062,865 L1108,865" marker-end="url(#arr)"/>
+  <text class="lbl" x="1066" y="856">verdict</text>
+
+  <!-- evaluator -> belief rules -->
+  <path class="edge" d="M910,930 L910,962" marker-end="url(#arr)"/>
+  <text class="lbl" x="918" y="950">cleared verdicts</text>
+
+  <!-- ======================= VERIFICATION HARNESS (FIX 5) ======================= -->
+  <rect class="fixbox" x="1108" y="790" width="338" height="200" rx="9"/>
+  <rect class="badge" x="1382" y="782" width="56" height="16" rx="8"/>
+  <text class="badgetext" x="1410" y="794" text-anchor="middle">FIX 5</text>
+  <text class="fixtitle" x="1124" y="810">Verification Harness (code + cheap LLM)</text>
+  <text class="body" x="1124" y="830">Grounding: cited evidence IDs must exist AND</text>
+  <text class="body" x="1124" y="844">attach to this claim — checked in Python</text>
+  <text class="body" x="1124" y="862">Blind re-read: small model reads the evidence,</text>
+  <text class="body" x="1124" y="876">answers "supports claim? y/n" without seeing verdict</text>
+  <text class="body" x="1124" y="894">Dual pass on high fan-out claims: two framings,</text>
+  <text class="body" x="1124" y="908">diff structured fields → disagreement escalates</text>
+  <text class="body" x="1124" y="926">Promotion ratchet: moving UP the ladder needs</text>
+  <text class="body" x="1124" y="940">more proof than moving down</text>
+  <text class="body" x="1124" y="958">Calibration log: every Verified-later-overturned</text>
+  <text class="body" x="1124" y="972">recorded → "Verified" gets an empirical meaning</text>
+
+  <!-- harness -> adjudication -->
+  <path class="edge" d="M1277,990 L1277,1022" marker-end="url(#arr)"/>
+  <text class="lbl" x="1287" y="1010">contradiction / disagreement</text>
+
+  <!-- ======================= BELIEF UPDATE RULES (FIX 1,2,3) ======================= -->
+  <rect class="fixbox" x="758" y="962" width="304" height="186" rx="9"/>
+  <rect class="badge" x="932" y="954" width="122" height="16" rx="8"/>
+  <text class="badgetext" x="993" y="966" text-anchor="middle">FIX 1 · 2 · 3</text>
+  <text class="fixtitle" x="774" y="982">Belief Update Rules (code-owned)</text>
+  <text class="body" x="774" y="1002">Typed ladder: every position carries its</text>
+  <text class="body" x="774" y="1016">justification type (empirical / deductive /</text>
+  <text class="body" x="774" y="1030">testimonial) — no cross-type comparisons</text>
+  <text class="body" x="774" y="1048">Aggregation, not pure weakest-link:</text>
+  <text class="body" x="774" y="1062">N independent medium supports can promote;</text>
+  <text class="body" x="774" y="1076">correlated sources clustered, counted once</text>
+  <text class="body" x="774" y="1094">Anchor tension: evidence contradicts an</text>
+  <text class="body" x="774" y="1108">anchor → anchor STANDS (user's given) but a</text>
+  <text class="body" x="774" y="1122">tension flag is raised and shown in report</text>
+  <text class="lbl" x="774" y="1140">legal-move table asserted in Python</text>
+
+  <!-- ======================= ADJUDICATION ======================= -->
+  <rect class="box" x="1108" y="1022" width="338" height="112" rx="9"/>
+  <text class="title" x="1277" y="1042" text-anchor="middle">Adjudication Task</text>
+  <text class="body" x="1124" y="1061">Independent review (frontier model, isolated</text>
+  <text class="body" x="1124" y="1075">call — never batched) · Seek new evidence</text>
+  <text class="body" x="1124" y="1093">Verdict → resolve, or mark Contested</text>
+  <text class="body" x="1124" y="1109">Propagate contested flag to ledger</text>
+
+  <!-- adjudication -> contested router -->
+  <path class="edge" d="M1277,1134 L1277,1218 L1062,1218" marker-end="url(#arr)"/>
+  <text class="lbl" x="1290" y="1180">contested</text>
+
+  <!-- belief rules -> contested router -->
+  <path class="edge" d="M910,1148 L910,1180" marker-end="url(#arr)"/>
+
+  <!-- ======================= CONTESTED ROUTER (FIX 4) ======================= -->
+  <rect class="fixbox" x="758" y="1180" width="304" height="186" rx="9"/>
+  <rect class="badge" x="998" y="1172" width="56" height="16" rx="8"/>
+  <text class="badgetext" x="1026" y="1184" text-anchor="middle">FIX 4</text>
+  <text class="fixtitle" x="774" y="1200">Contested Decision Function</text>
+  <text class="body" x="774" y="1220">fan_out = 0 → IGNORE, log as</text>
+  <text class="body" x="774" y="1234">"unresolved, non-load-bearing"</text>
+  <text class="body" x="774" y="1252">else cheap sensitivity probe:</text>
+  <text class="body" x="774" y="1270">· same conclusion both ways → COLLAPSE,</text>
+  <text class="body" x="774" y="1284">&#160;&#160;note "holds under either branch"</text>
+  <text class="body" x="774" y="1302">· conclusions diverge → BRANCH, bounded:</text>
+  <text class="body" x="774" y="1316">&#160;&#160;depth cap 1, conditional conclusions</text>
+  <text class="body" x="774" y="1334">· branches give opposite recommendations →</text>
+  <text class="body" x="774" y="1348">&#160;&#160;surface "resolve THIS question first"</text>
+
+  <!-- router -> checkpoint -->
+  <path class="edge" d="M758,1273 L580,1273" marker-end="url(#arr)"/>
+  <text class="lbl" x="618" y="1264">branch tags / verdicts</text>
+
+  <!-- ======================= CHECKPOINT ======================= -->
+  <rect class="box" x="260" y="1180" width="320" height="186" rx="9"/>
+  <rect class="badge" x="516" y="1172" width="56" height="16" rx="8"/>
+  <text class="badgetext" x="544" y="1184" text-anchor="middle">FIX 6</text>
+  <text class="title" x="420" y="1200" text-anchor="middle">Checkpoint</text>
+  <text class="body" x="276" y="1220">Fixpoint? no belief changes + no ready</text>
+  <text class="body" x="276" y="1234">tasks → STOP (don't burn the budget)</text>
+  <text class="body" x="276" y="1252">Max iterations? Success criteria satisfied?</text>
+  <text class="fixline" x="276" y="1272">Criteria revision channel: system may</text>
+  <text class="fixline" x="276" y="1286">PROPOSE revised success criteria — applied</text>
+  <text class="fixline" x="276" y="1300">only if user ratifies (same gate pattern);</text>
+  <text class="fixline" x="276" y="1314">revision distance capped</text>
+  <text class="body" x="276" y="1334">Stop → Final Report</text>
+  <text class="body" x="276" y="1350">Continue → Compressor</text>
+
+  <!-- checkpoint -> compressor -->
+  <path class="edge" d="M420,1366 L420,1420" marker-end="url(#arr)"/>
+  <text class="lbl" x="428" y="1398">continue</text>
+
+  <!-- checkpoint -> final report (stop path, routed around compressor) -->
+  <path class="edge" d="M580,1340 L664,1340 L664,1700 L580,1700" marker-end="url(#arr)"/>
+  <text class="lbl" x="672" y="1520">stop</text>
+
+  <!-- ======================= COMPRESSOR (FIX 7) ======================= -->
+  <rect class="fixbox" x="260" y="1420" width="320" height="150" rx="9"/>
+  <rect class="badge" x="516" y="1412" width="56" height="16" rx="8"/>
+  <text class="badgetext" x="544" y="1424" text-anchor="middle">FIX 7</text>
+  <text class="fixtitle" x="420" y="1440" text-anchor="middle">Compressor</text>
+  <text class="body" x="276" y="1460">Structured state carried VERBATIM as data:</text>
+  <text class="body" x="276" y="1474">belief table · contested list · anchor</text>
+  <text class="body" x="276" y="1488">tensions · open contradictions</text>
+  <text class="body" x="276" y="1506">Only narrative context is LLM-summarized</text>
+  <text class="fixline" x="276" y="1526">Integrity assert (Python): every Contested</text>
+  <text class="fixline" x="276" y="1540">before == Contested after; flags can't be</text>
+  <text class="fixline" x="276" y="1554">summarized away</text>
+
+  <!-- compressor -> planner loop -->
+  <path class="edge" d="M260,1495 L168,1495 L168,704 L260,704" marker-end="url(#arr)"/>
+  <text class="lbl" x="60" y="1090">next iteration</text>
+  <text class="lbl" x="60" y="1104">(carry-over packet)</text>
+
+  <!-- ======================= FINAL REPORT ======================= -->
+  <rect class="box" x="260" y="1620" width="320" height="196" rx="9"/>
+  <text class="title" x="420" y="1640" text-anchor="middle">Final Report</text>
+  <text class="body" x="276" y="1660">Conclusions — conditional branches labeled,</text>
+  <text class="body" x="276" y="1674">never silently merged</text>
+  <text class="body" x="276" y="1690">Belief states with evidence TYPES shown</text>
+  <text class="body" x="276" y="1706">Contested claims + what would resolve them</text>
+  <text class="body" x="276" y="1722">Anchor tensions: "conditional on your givens,</text>
+  <text class="body" x="276" y="1736">given X conflicts with evidence E"</text>
+  <text class="body" x="276" y="1752">Unaudited low-impact claims labeled as such</text>
+  <text class="body" x="276" y="1768">Provenance + security log (rejected policy</text>
+  <text class="body" x="276" y="1782">lines, warnings) · Reasoning trace</text>
+  <text class="body" x="276" y="1798">Calibration stats to date</text>
+
+  <!-- ======================= PROTECTED KERNEL ======================= -->
+  <rect class="kernelbox" x="1080" y="30" width="380" height="238" rx="10"/>
+  <text class="ktitle" x="1270" y="52" text-anchor="middle">PROTECTED KERNEL — Structural Invariants</text>
+  <text class="kline" x="1098" y="76">Enforced in code, above user policy. Not writable.</text>
+  <text class="kline" x="1098" y="98">· Belief ledger mutated only by cleared verdicts —</text>
+  <text class="kline" x="1098" y="112">&#160;&#160;LLM output alone never writes state</text>
+  <text class="kline" x="1098" y="130">· Contradictions never silently resolved:</text>
+  <text class="kline" x="1098" y="144">&#160;&#160;adjudicated or marked Contested, always</text>
+  <text class="kline" x="1098" y="162">· Provenance always recorded (orchestrator writes it)</text>
+  <text class="kline" x="1098" y="180">· Anchors constrain reasoning but are always labeled</text>
+  <text class="kline" x="1098" y="194">&#160;&#160;as anchors in output; tensions always surfaced</text>
+  <text class="kline" x="1098" y="212">· Policy tunes behavior within these bounds; it can</text>
+  <text class="kline" x="1098" y="226">&#160;&#160;never disable a component or override authority</text>
+  <text class="kline" x="1098" y="248">· Control flow is a Python state machine, not an LLM</text>
+
+  <!-- kernel dotted arrows -->
+  <path class="kedge" d="M1270,268 L1277,788" marker-end="url(#karr)"/>
+  <text class="lbl" x="1288" y="540" fill="#5d4a9c">constrains</text>
+  <path class="kedge" d="M1080,240 L910,638" marker-end="url(#karr)"/>
+  <path class="kedge" d="M1080,150 L580,436" marker-end="url(#karr)"/>
+</svg>
+</div>
+
+<div class="legend">
+  <h2>FIX INDEX — your issue list &#8594; the mechanism on the diagram</h2>
+  <ol>
+    <li><b>FIX 1</b> — Confidence system: evidence ladder becomes <em>typed</em>; every position carries its justification type, so incommensurable evidence is never compared on one scale.</li>
+    <li><b>FIX 2</b> — Weakest-link reasoning: replaced by support <em>aggregation</em> — independent lines of medium evidence can promote a claim; correlated sources are clustered and counted once.</li>
+    <li><b>FIX 3</b> — Anchor conflict: anchors are never overturned, but evidence against them raises an <em>anchor tension flag</em> that survives all the way into the Final Report.</li>
+    <li><b>FIX 4</b> — Disagreement / branching: Contested claims hit a decision function — ignore (no fan-out), collapse (probe shows same conclusion), or bounded branch with labeled conditional conclusions.</li>
+    <li><b>FIX 5</b> — Evaluator god: verdicts are proposals; a code-level harness checks evidence IDs, blind-re-reads evidence, dual-passes high-stakes claims, applies a promotion ratchet, and logs calibration.</li>
+    <li><b>FIX 6</b> — Problem evolvement: the system may propose revised success criteria at a Checkpoint; the user ratifies through the same gate pattern; revision distance is capped.</li>
+    <li><b>FIX 7</b> — Summary prose: the Compressor carries structured state verbatim as data and only summarizes narrative; a Python assert guarantees no Contested flag disappears.</li>
+    <li><b>FIX 8</b> — Verification recursion: verification artifacts never spawn verification tasks; the depth cap forces Contested rather than looping.</li>
+    <li><b>FIX 9</b> — Parallelism: executors read versioned snapshots; if a premise is demoted after the snapshot, the dependent artifact is auto-queued for re-evaluation (or evaluate serially in v1).</li>
+    <li><span class="k">KERNEL</span> — the invariants sit above user policy and are enforced by the orchestrator’s Python control flow, not by prompting.</li>
+  </ol>
+</div>
+
+</body>
+</html>
