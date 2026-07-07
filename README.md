@@ -2,6 +2,9 @@
 
 > **Computational reasoning for decisions that matter.**
 
+<p align="center">
+  <img src="LOGO.png" height="600">
+</p>
 Most AI systems optimize for producing an answer.
 
 **Xogito optimizes for producing a conclusion you can defend.**
