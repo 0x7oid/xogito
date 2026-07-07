@@ -3,7 +3,7 @@
 > **Computational reasoning for decisions that matter.**
 
 <p>
-  <img src="LOGO.png">
+  <img src="LOGO.png" height="500">
 </p>
 Most AI systems optimize for producing an answer.
 
