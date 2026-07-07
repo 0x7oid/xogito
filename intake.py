@@ -90,8 +90,6 @@ def collect_user_query():
         policy_base=get_user_policy_base(),
     )
 
-    print(query.summary())
-
     return query
 
 
