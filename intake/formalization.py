@@ -599,19 +599,39 @@ def build_problem_specification(query, record):
         "decision": record["decision"],
     }
 
-
+def ratify_with_user(spec):
+    # does the actual asking - lives here, not in kernel, because this
+    # is I/O (print + input), and kernel never touches I/O.
+    print("\n===== PROBLEM SPECIFICATION =====")
+    print(json.dumps(spec["problem_specification"], indent=2))
+    print("==================================")
+ 
+    answer = input("Confirm this spec? (yes / no) > ").strip().lower()
+    spec["ratified"] = (answer == "yes")
+ 
+    if not spec["ratified"]:
+        print("Not ratified - send back for repair or ask the user to edit.")
+ 
+    return spec
+ 
+ 
 if __name__ == "__main__":
     from intake import collect_user_query
-
+    from kernel import assert_spec_ratified
+ 
     query = collect_user_query()
     result = formalize(query, max_fields=4)
     print(json.dumps(result, indent=2))
-
-    if not result["decision"]["contested"] and result["decision"]["selected_structure_id"]:
-        print("\n===== PROBLEM SPECIFICATION =====")
-        spec = build_problem_specification(query, result)
-        print(json.dumps(spec, indent=2))
-    elif result["decision"]["contested"]:
+ 
+    if result["decision"]["contested"]:
         print("\nTied formalizations - ask the user to choose before proceeding.")
-    else:
+ 
+    elif result["decision"]["selected_structure_id"] is None:
         print("\nNo formal structure applied to this problem.")
+ 
+    else:
+        spec = build_problem_specification(query, result)
+        spec = ratify_with_user(spec)          # does the asking
+ 
+        assert_spec_ratified(spec)             # refuses to proceed if not ratified
+        print("\nSpec ratified - ready for the Planner.")
