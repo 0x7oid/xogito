@@ -22,7 +22,7 @@ The id-mismatch fix, kept simple:
 
 import json
 
-from client import ask_llm
+from llm.client import ask_llm
 from intake import UserQuery
 
 
@@ -127,7 +127,7 @@ def _match_one(raw, allowed_structures, phase):
 
     # tier 1: exact
     hits = [sid for sid, vs in variants.items() if text in vs]
-    # tier 2: token containment ("mathematical optimization" ⊇ "optimization")
+    # tier 2: token containment ("mathematical optimization" superset of "optimization")
     if not hits:
         hits = [sid for sid, vs in variants.items() if any(set(v.split()) <= words for v in vs)]
     # tier 3: fuzzy (typos)
@@ -459,13 +459,151 @@ def formalize(query, max_fields=4):
         "candidates": formalizations,
         "evaluations": evaluations,
         "decision": {
-            "mode": "user_ratified" if contested else "auto_selected",
-            "selected_structure_id": best["structure_id"],
+            # when contested, no structure is chosen yet - a human must ratify.
+            # we do NOT pretend a winner was picked.
+            "mode": "needs_user_ratification" if contested else "auto_selected",
+            "selected_structure_id": None if contested else best["structure_id"],
             "contested": contested,
         },
     }
 
     return record
+
+
+# ---------------------------------------------------------------------------
+# Hand off the actual problem specification.
+#
+# The record above is the full paper trail. This is the ONE sanctioned way
+# to pull out the formalization that the rest of the pipeline should use.
+# It refuses to hand anything over when the choice is contested or when no
+# structure applied - so a caller can never silently proceed on a tie.
+# ---------------------------------------------------------------------------
+
+def get_final_formalization(record):
+    decision = record["decision"]
+
+    if decision["contested"]:
+        raise ValueError(
+            "formalization is contested - two structures tied. "
+            "Ask the user to pick one before continuing."
+        )
+
+    if decision["selected_structure_id"] is None:
+        raise ValueError("no formal structure applied to this problem.")
+
+    chosen_id = decision["selected_structure_id"]
+    for c in record["candidates"]:
+        if c["structure_id"] == chosen_id:
+            # the problem specification the Planner will consume
+            return {
+                "problem": record["problem"],
+                "characteristics": record["characteristics"],
+                "structure_id": chosen_id,
+                "formal_statement": c["formal_statement"],
+                "preserved_from_original": c["preserved_from_original"],
+                "dropped_or_altered": c["dropped_or_altered"],
+            }
+
+    raise ValueError(f"chosen structure {chosen_id!r} not found in candidates.")
+
+
+# ---------------------------------------------------------------------------
+# Build the final Problem Specification.
+#
+# Independent function. Takes the formalization record (the reasoning
+# trail) + the original UserQuery, and produces the document the rest of
+# the pipeline consumes:
+#
+#   {
+#     "problem_specification": { goal, constraints, success_criteria,
+#                                scope, contextual_anchors, assumptions },
+#     "characteristics": {...},   <- kept: the reasoning trail
+#     "selection": {...},
+#     "candidates": [...],
+#     "evaluations": [...],
+#     "decision": {...}
+#   }
+#
+# One LLM call extracts goal / constraints / success_criteria /
+# assumptions under the WINNING structure only. Scope and anchors are
+# copied verbatim from the user - the model never gets to reword what
+# the user declared as fixed.
+# ---------------------------------------------------------------------------
+
+SPEC_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "goal": {
+            "type": "string",
+            "description": "The goal stated precisely under the chosen formal structure.",
+        },
+        "constraints": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Hard limits the solution must respect. Empty list if none.",
+        },
+        "success_criteria": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Checkable conditions that tell us the goal was reached. Empty list if none.",
+        },
+        "assumptions": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Things taken for granted that were NOT declared by the user. Empty list if none.",
+        },
+    },
+    "required": ["goal", "constraints", "success_criteria", "assumptions"],
+}
+
+
+def _split_anchors(raw_anchors):
+    # user anchors stay verbatim - code only splits them into a list,
+    # never rewords them. Splits on newlines and semicolons and commas.
+    if not raw_anchors:
+        return []
+
+    pieces = []
+    for line in raw_anchors.replace(";", "\n").replace(",", "\n").split("\n"):
+        line = line.strip()
+        if line:
+            pieces.append(line)
+    return pieces
+
+
+def build_problem_specification(query, record):
+    # this raises on contested / no-structure, so we can't build a spec
+    # from an unratified decision - the door stays locked.
+    final = get_final_formalization(record)
+
+    prompt = (
+        "Extract a problem specification from the problem below, using "
+        "the chosen formal framing. Do not invent constraints or criteria "
+        "the problem doesn't imply. Anything you had to take for granted "
+        "goes in assumptions.\n\n"
+        f"Problem: {query.prompt}\n"
+        f"Scope: {query.scope or 'not specified'}\n"
+        f"Chosen framing ({final['structure_id']}): {final['formal_statement']}\n"
+        f"Parts that didn't map cleanly: {final['dropped_or_altered']}\n"
+    )
+    extracted = json.loads(ask_llm(prompt, SPEC_SCHEMA))
+
+    return {
+        "problem_specification": {
+            "goal": extracted["goal"],
+            "constraints": extracted["constraints"],
+            "success_criteria": extracted["success_criteria"],
+            "scope": query.scope or "not specified",
+            "contextual_anchors": _split_anchors(query.contextual_anchors),
+            "assumptions": extracted["assumptions"],
+        },
+        "structure_id": final["structure_id"],
+        "characteristics": record["characteristics"],
+        "selection": record["selection"],
+        "candidates": record["candidates"],
+        "evaluations": record["evaluations"],
+        "decision": record["decision"],
+    }
 
 
 if __name__ == "__main__":
@@ -474,3 +612,12 @@ if __name__ == "__main__":
     query = collect_user_query()
     result = formalize(query, max_fields=4)
     print(json.dumps(result, indent=2))
+
+    if not result["decision"]["contested"] and result["decision"]["selected_structure_id"]:
+        print("\n===== PROBLEM SPECIFICATION =====")
+        spec = build_problem_specification(query, result)
+        print(json.dumps(spec, indent=2))
+    elif result["decision"]["contested"]:
+        print("\nTied formalizations - ask the user to choose before proceeding.")
+    else:
+        print("\nNo formal structure applied to this problem.")
