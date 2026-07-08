@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Xogito — Module Interaction Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#232A2D; --muted:#5C6B6E; --paper:#F4F6F3; --box:#FFFFFF;
+    --fix:#0E7A6E; --fixfill:#E4F4F0;
+    --kernel:#7B2E42; --kernelfill:#F9EEF1;
+    --calib:#8A6D00; --calibfill:#FBF3DA;
+    --done:#0E7A6E;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--paper);
+    background-image:radial-gradient(circle,#D8DFDA 1px,transparent 1px);
+    background-size:26px 26px;
+    color:var(--ink);
+    font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+    padding:32px 16px 64px;
+  }
+  header{max-width:1120px;margin:0 auto 22px}
+  .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--fix);font-weight:600}
+  h1{font-family:'Space Grotesk',system-ui,sans-serif;font-size:clamp(22px,3.6vw,34px);font-weight:700;line-height:1.15;margin:6px 0 10px}
+  header p{font-size:13px;color:var(--muted);max-width:74ch;line-height:1.6}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:12px}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .swatch{width:14px;height:14px;border-radius:3px;border:1.5px solid var(--ink)}
+  .swatch.done{background:var(--fixfill);border-color:var(--fix)}
+  .swatch.kernel{background:var(--kernelfill);border-color:var(--kernel);border-style:dashed}
+  .swatch.calib{background:var(--calibfill);border-color:var(--calib);border-style:dashed}
+  .swatch.plan{background:var(--box)}
+  .diagram-wrap{
+    max-width:1300px;margin:0 auto;overflow-x:auto;
+    border:1.5px solid var(--ink);border-radius:10px;background:rgba(255,255,255,.55);
+    padding:10px;
+  }
+  svg{display:block;min-width:1180px}
+  .index{max-width:1120px;margin:36px auto 0}
+  .index h2{font-family:'Space Grotesk',sans-serif;font-size:20px;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;font-size:12px;background:var(--box);border:1.5px solid var(--ink)}
+  th,td{padding:9px 11px;border-bottom:1px solid #DDE4E0;text-align:left;vertical-align:top;line-height:1.5}
+  th{font-family:'Space Grotesk',sans-serif;font-size:12.5px;background:var(--fixfill);border-bottom:1.5px solid var(--ink)}
+  tr:last-child td{border-bottom:none}
+  code{background:#EEF2EF;padding:1px 5px;border-radius:4px;font-size:11.5px}
+  .tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:9px;color:#fff}
+  .tag.done{background:var(--done)}
+  .tag.plan{background:#8FA0A3}
+  footnote{display:block;font-size:11.5px;color:var(--muted);margin-top:12px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Xogito · internal architecture</div>
+  <h1>Module Interaction Map</h1>
+  <p>How the orchestrator's files call each other, in the order they fire, for a single run.
+     Solid arrows are direct calls carrying data. Dashed arrows are validation/logging —
+     no control passes, only a check or a record. <code>intake.py</code> is built and tested
+     today; everything else below is the planned shape it will call into next.</p>
+  <div class="legend">
+    <span><i class="swatch done"></i>implemented</span>
+    <span><i class="swatch plan"></i>planned</span>
+    <span><i class="swatch kernel"></i>kernel.py — validates, never called directly</span>
+    <span><i class="swatch calib"></i>calibration.py — logs, never called directly</span>
+  </div>
+</header>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 1180 1980" xmlns="http://www.w3.org/2000/svg" font-family="'IBM Plex Mono',monospace">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#232A2D"/>
+    </marker>
+    <marker id="arrk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7B2E42"/>
+    </marker>
+    <marker id="arrc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6D00"/>
+    </marker>
+  </defs>
+  <style>
+    .box{fill:#FFFFFF;stroke:#232A2D;stroke-width:1.6}
+    .donebox{fill:#E4F4F0;stroke:#0E7A6E;stroke-width:1.8}
+    .kbox{fill:#F9EEF1;stroke:#7B2E42;stroke-width:1.6;stroke-dasharray:6 4}
+    .cbox{fill:#FBF3DA;stroke:#8A6D00;stroke-width:1.6;stroke-dasharray:6 4}
+    .title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;fill:#232A2D}
+    .file{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;fill:#5C6B6E}
+    .ln{font-size:10.5px;fill:#232A2D}
+    .flow{stroke:#232A2D;stroke-width:1.6;fill:none}
+    .flowk{stroke:#7B2E42;stroke-width:1.3;fill:none;stroke-dasharray:3 4}
+    .flowc{stroke:#8A6D00;stroke-width:1.3;fill:none;stroke-dasharray:3 4}
+    .lbl{font-size:10px;fill:#5C6B6E}
+    .lblk{font-size:10px;fill:#7B2E42}
+    .lblc{font-size:10px;fill:#8A6D00}
+    .tagd{fill:#0E7A6E}
+    .tagt{font-size:9.5px;font-weight:600;fill:#fff}
+  </style>
+
+  <!-- orchestrator.py top bar -->
+  <rect class="box" x="330" y="18" width="360" height="46" rx="8"/>
+  <text class="file" x="510" y="35" text-anchor="middle">orchestrator.py</text>
+  <text class="ln" x="510" y="52" text-anchor="middle">drives the sequence below — holds no logic itself</text>
+
+  <path class="flow" d="M510,64 L510,92" marker-end="url(#arr)"/>
+
+  <!-- intake.py -->
+  <rect class="donebox" x="310" y="96" width="400" height="70" rx="8"/>
+  <rect class="tagd" x="672" y="104" width="30" height="16" rx="8"/>
+  <text class="tagt" x="687" y="116" text-anchor="middle">✓</text>
+  <text class="file" x="330" y="118">intake.py</text>
+  <text class="ln" x="330" y="138">collect_user_query() → UserQuery</text>
+  <text class="ln" x="330" y="153">(prompt required; scope/anchors/policy optional)</text>
+
+  <path class="flow" d="M510,166 L510,196" marker-end="url(#arr)"/>
+  <text class="lbl" x="524" y="185">UserQuery</text>
+
+  <!-- formalisation.py -->
+  <rect class="box" x="310" y="200" width="400" height="90" rx="8"/>
+  <text class="file" x="330" y="222">formalisation.py</text>
+  <text class="ln" x="330" y="244">formalize(query) → ProblemSpec</text>
+  <text class="ln" x="330" y="260">runs formalizability checks (goal / criteria /</text>
+  <text class="ln" x="330" y="274">scope / consistency) → repair loop if failed</text>
+
+  <path class="flow" d="M510,290 L510,320" marker-end="url(#arr)"/>
+  <text class="lbl" x="524" y="309">ratified ProblemSpec</text>
+
+  <!-- workspace.py init -->
+  <rect class="box" x="310" y="324" width="400" height="66" rx="8"/>
+  <text class="file" x="330" y="345">workspace.py</text>
+  <text class="ln" x="330" y="365">Workspace.init(spec) → task graph, artifact</text>
+  <text class="ln" x="330" y="380">store, belief table, provenance log — all empty</text>
+
+  <path class="flow" d="M510,390 L510,418" marker-end="url(#arr)"/>
+
+  <!-- iteration loop bracket -->
+  <rect x="270" y="422" width="480" height="920" fill="none" stroke="#232A2D" stroke-width="1.2" stroke-dasharray="2 3" rx="10"/>
+  <text class="ln" x="290" y="416" font-weight="700">ITERATION LOOP — capped at 5 (kernel-owned, fixed)</text>
+
+  <!-- planner.py -->
+  <rect class="box" x="310" y="440" width="400" height="70" rx="8"/>
+  <text class="file" x="330" y="462">planner.py</text>
+  <text class="ln" x="330" y="482">plan(workspace) → tasks written into task graph</text>
+  <text class="ln" x="330" y="497">verify-tasks capped at depth 1 (no recursive verify)</text>
+
+  <path class="flow" d="M510,510 L510,538" marker-end="url(#arr)"/>
+
+  <!-- scheduler.py -->
+  <rect class="box" x="310" y="542" width="400" height="60" rx="8"/>
+  <text class="file" x="330" y="563">scheduler.py</text>
+  <text class="ln" x="330" y="583">ready_tasks(workspace) → prioritized task list</text>
+
+  <path class="flow" d="M510,602 L510,630" marker-end="url(#arr)"/>
+
+  <!-- executor.py -->
+  <rect class="box" x="310" y="634" width="400" height="70" rx="8"/>
+  <text class="file" x="330" y="656">executor.py</text>
+  <text class="ln" x="330" y="676">run(task, workspace.snapshot()) → Artifact</text>
+  <text class="ln" x="330" y="691">reads a stamped belief snapshot, not live state</text>
+
+  <path class="flow" d="M510,704 L510,732" marker-end="url(#arr)"/>
+  <text class="lbl" x="524" y="721">Artifact</text>
+
+  <!-- workspace.py store -->
+  <rect class="box" x="310" y="736" width="400" height="58" rx="8"/>
+  <text class="file" x="330" y="757">workspace.py</text>
+  <text class="ln" x="330" y="776">store(artifact) → validated + linked to provenance</text>
+
+  <path class="flow" d="M510,794 L510,822" marker-end="url(#arr)"/>
+
+  <!-- evaluator.py -->
+  <rect class="donebox" x="310" y="826" width="400" height="94" rx="8" fill="#FFFFFF" stroke="#232A2D"/>
+  <text class="file" x="330" y="848">evaluator.py</text>
+  <text class="ln" x="330" y="868">evaluate(workspace) → belief updates, typed rungs</text>
+  <text class="ln" x="330" y="883">flags: contradiction · duplicate · anchor tension</text>
+  <text class="ln" x="330" y="898">every verdict must cite evidence IDs</text>
+
+  <!-- kernel arrow into evaluator -->
+  <path class="flowk" d="M270,873 L150,873" marker-end="url(#arrk)"/>
+  <!-- calibration arrow out of evaluator -->
+  <path class="flowc" d="M710,873 L900,873" marker-end="url(#arrc)"/>
+
+  <path class="flow" d="M510,920 L510,948" marker-end="url(#arr)"/>
+  <text class="lbl" x="524" y="937">contradiction?</text>
+
+  <!-- adjudicator + contested -->
+  <rect class="box" x="310" y="952" width="192" height="88" rx="8"/>
+  <text class="file" x="326" y="974">adjudicator.py</text>
+  <text class="ln" x="326" y="994">adjudicate(claim) →</text>
+  <text class="ln" x="326" y="1008">verdict / Contested</text>
+
+  <rect class="box" x="518" y="952" width="192" height="88" rx="8"/>
+  <text class="file" x="534" y="974">contested.py</text>
+  <text class="ln" x="534" y="994">decide(claim) → ignore /</text>
+  <text class="ln" x="534" y="1008">collapse / bounded branch</text>
+
+  <path class="flow" d="M502,996 L518,996" marker-end="url(#arr)"/>
+
+  <!-- kernel into adjudicator -->
+  <path class="flowk" d="M310,996 L150,996 L150,873" marker-end="url(#arrk)"/>
+  <!-- calibration into adjudicator/contested -->
+  <path class="flowc" d="M710,996 L900,996 L900,873" marker-end="url(#arrc)"/>
+
+  <!-- branch back to planner -->
+  <path class="flow" d="M710,975 L760,975 L760,475 L710,475" marker-end="url(#arr)"/>
+  <text class="lbl" x="774" y="720" text-anchor="middle" transform="rotate(-90 774 720)">branch → new conditional tasks</text>
+
+  <path class="flow" d="M510,1040 L510,1068" marker-end="url(#arr)"/>
+
+  <!-- checkpoint.py -->
+  <rect class="box" x="310" y="1072" width="400" height="80" rx="8"/>
+  <text class="file" x="330" y="1094">checkpoint.py</text>
+  <text class="ln" x="330" y="1114">check(workspace) → continue / stop</text>
+  <text class="ln" x="330" y="1129">fixpoint check · may propose criteria revision</text>
+
+  <path class="flow" d="M510,1152 L510,1180" marker-end="url(#arr)"/>
+  <text class="lbl" x="524" y="1169">continue</text>
+
+  <!-- compressor.py -->
+  <rect class="box" x="310" y="1184" width="400" height="72" rx="8"/>
+  <text class="file" x="330" y="1206">compressor.py</text>
+  <text class="ln" x="330" y="1226">compress(workspace) → carry-over packet</text>
+  <text class="ln" x="330" y="1241">belief table / contested list pass verbatim (data)</text>
+
+  <!-- loop back to planner -->
+  <path class="flow" d="M310,1220 L230,1220 L230,475 L306,475" marker-end="url(#arr)"/>
+  <text class="lbl" x="222" y="850" text-anchor="middle" transform="rotate(-90 222 850)">next iteration</text>
+
+  <!-- stop path to report -->
+  <path class="flow" d="M710,1112 L760,1112 L760,1720 L710,1720" marker-end="url(#arr)"/>
+  <text class="lbl" x="774" y="1420" text-anchor="middle" transform="rotate(-90 774 1420)">stop → report.py</text>
+
+  <!-- kernel.py side box -->
+  <rect class="kbox" x="30" y="826" width="200" height="240" rx="8"/>
+  <text class="title" x="50" y="850" fill="#7B2E42">kernel.py</text>
+  <text class="ln" x="50" y="872">validate_transition()</text>
+  <text class="ln" x="50" y="888">legal-move table for</text>
+  <text class="ln" x="50" y="902">belief states</text>
+  <text class="ln" x="50" y="922">Imported by workspace,</text>
+  <text class="ln" x="50" y="936">evaluator, adjudicator,</text>
+  <text class="ln" x="50" y="950">report. Never calls out —</text>
+  <text class="ln" x="50" y="964">only checked against.</text>
+  <text class="ln" x="50" y="984">No agent output reaches</text>
+  <text class="ln" x="50" y="998">state without passing</text>
+  <text class="ln" x="50" y="1012">this file first.</text>
+  <text class="ln" x="50" y="1036">FIX 5 lives here.</text>
+
+  <!-- calibration.py side box -->
+  <rect class="cbox" x="920" y="826" width="200" height="240" rx="8"/>
+  <text class="title" x="940" y="850" fill="#8A6D00">calibration.py</text>
+  <text class="ln" x="940" y="872">log_overturn(verdict)</text>
+  <text class="ln" x="940" y="892">Written to by evaluator</text>
+  <text class="ln" x="940" y="906">and adjudicator whenever</text>
+  <text class="ln" x="940" y="920">a "Verified" claim later</text>
+  <text class="ln" x="940" y="934">flips.</text>
+  <text class="ln" x="940" y="958">Read once, at the end,</text>
+  <text class="ln" x="940" y="972">by report.py — turns into</text>
+  <text class="ln" x="940" y="986">"Verified = 91% historically"</text>
+  <text class="ln" x="940" y="1006">Pure side-channel: no file</text>
+  <text class="ln" x="940" y="1020">ever calls INTO it for logic.</text>
+
+  <path class="flowc" d="M1020,1066 L1020,1160 L710,1720" marker-end="url(#arrc)"/>
+
+  <!-- report.py -->
+  <rect class="box" x="310" y="1724" width="400" height="110" rx="8"/>
+  <text class="file" x="330" y="1748">report.py</text>
+  <text class="ln" x="330" y="1770">generate(workspace, calibration_log) → Final Report</text>
+  <text class="ln" x="330" y="1786">conclusions · belief states · contested claims</text>
+  <text class="ln" x="330" y="1801">anchor tensions · provenance · calibration stats</text>
+
+  <path class="flowk" d="M230,1066 L230,1780 L306,1780" marker-end="url(#arrk)"/>
+  <text class="lblk" x="220" y="1450" text-anchor="middle" transform="rotate(-90 220 1450)">anchor labels enforced</text>
+
+  <text class="lbl" x="510" y="1868" text-anchor="middle">Every arrow into evaluator.py / adjudicator.py / workspace.py / report.py is checked against kernel.py first.</text>
+  <text class="lbl" x="510" y="1886" text-anchor="middle">Nothing in this diagram lets an agent write belief state directly — only these files may, and only via kernel.py's validator.</text>
+</svg>
+</div>
+
+<div class="index">
+  <h2>File reference</h2>
+  <table>
+    <tr><th>File</th><th>Status</th><th>Called by</th><th>Calls into</th><th>Produces</th></tr>
+    <tr>
+      <td><code>orchestrator.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>—  (entry point)</td>
+      <td>every file below, in sequence</td>
+      <td>nothing itself — pure sequencing</td>
+    </tr>
+    <tr>
+      <td><code>intake.py</code></td><td><span class="tag done">implemented</span></td>
+      <td>orchestrator.py</td>
+      <td>— (no dependencies)</td>
+      <td><code>UserQuery</code></td>
+    </tr>
+    <tr>
+      <td><code>formalisation.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>orchestrator.py</td>
+      <td>kernel.py (consistency rules)</td>
+      <td><code>ProblemSpec</code> (ratified)</td>
+    </tr>
+    <tr>
+      <td><code>workspace.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>orchestrator.py, executor.py, evaluator.py</td>
+      <td>kernel.py (schema + transition checks)</td>
+      <td>task graph, artifact store, belief table, provenance</td>
+    </tr>
+    <tr>
+      <td><code>planner.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>orchestrator.py, contested.py (branch tasks)</td>
+      <td>workspace.py (reads/writes task graph)</td>
+      <td>updated task graph</td>
+    </tr>
+    <tr>
+      <td><code>scheduler.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>orchestrator.py</td>
+      <td>workspace.py (reads task graph)</td>
+      <td>prioritized ready-task list</td>
+    </tr>
+    <tr>
+      <td><code>executor.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>orchestrator.py</td>
+      <td>workspace.py (snapshot read)</td>
+      <td>Artifact + evidence + provenance</td>
+    </tr>
+    <tr>
+      <td><code>evaluator.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>orchestrator.py</td>
+      <td>kernel.py (validate), calibration.py (log)</td>
+      <td>belief updates, flags (contradiction / anchor tension)</td>
+    </tr>
+    <tr>
+      <td><code>adjudicator.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>evaluator.py (escalation)</td>
+      <td>kernel.py, calibration.py</td>
+      <td>verdict or Contested marking</td>
+    </tr>
+    <tr>
+      <td><code>contested.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>adjudicator.py</td>
+      <td>workspace.py (fan-out lookup), planner.py (branch tasks)</td>
+      <td>ignore / collapse / bounded branch decision</td>
+    </tr>
+    <tr>
+      <td><code>checkpoint.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>orchestrator.py</td>
+      <td>workspace.py (reads state)</td>
+      <td>continue / stop decision</td>
+    </tr>
+    <tr>
+      <td><code>compressor.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>orchestrator.py</td>
+      <td>workspace.py</td>
+      <td>carry-over packet for next iteration</td>
+    </tr>
+    <tr>
+      <td><code>kernel.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>never called directly — imported only</td>
+      <td>— (no dependencies; foundation layer)</td>
+      <td>validators / legal-move table</td>
+    </tr>
+    <tr>
+      <td><code>calibration.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>never called directly — imported only</td>
+      <td>— (no dependencies)</td>
+      <td>overturn log, read once by report.py</td>
+    </tr>
+    <tr>
+      <td><code>report.py</code></td><td><span class="tag plan">planned</span></td>
+      <td>orchestrator.py (on stop)</td>
+      <td>workspace.py, calibration.py, kernel.py (anchor labeling)</td>
+      <td>Final Report</td>
+    </tr>
+  </table>
+  <footnote>
+    Two files are deliberately never in the "calls into" column of anything upstream:
+    <code>kernel.py</code> and <code>calibration.py</code>. They're imported, not orchestrated —
+    that asymmetry is the point. A file that no one calls into can't be talked out of its job
+    by anything happening in the loop above it.
+  </footnote>
+</div>
+
+</body>
+</html>

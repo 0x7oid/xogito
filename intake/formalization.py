@@ -12,12 +12,6 @@ No numbers anywhere. Only labels. The cap on how many structures we try
 is a plain function argument (max_fields) - the LLM never sees this
 number, so it never nudges itself toward hitting it.
 
-The id-mismatch fix, kept simple:
-- Every LLM call gets a plain JSON schema dict (Gemini fills it).
-- The schema does NOT restrict which id the model writes - no nudging.
-- Instead, code resolves whatever the model wrote back to a catalog id
-  by normalized matching against the id OR the human name ("Constraint
-  Satisfaction" -> "csp"). Anything unresolvable raises loudly.
 """
 
 import json
