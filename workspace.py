@@ -167,6 +167,16 @@ class Workspace:
         
         self._claims[claim_id].evidence_ids.append(artifact_id)
         self._artifacts[artifact_id].claim_ids.append(claim_id)
+    def unlink_evidence(self , claim_id:int , artifact_id:int):
+        # a bidirectional unlink between a claim and an artifact
+        # without this function we would have a referential integrity violation between a claim and the artifact
+        if claim_id not in self._claims:
+            raise ValueError(f"Claim with id {claim_id} does not exist.")
+        if artifact_id not in self._artifacts:
+            raise ValueError(f"Artifact with id {artifact_id} does not exist.")
+        
+        self._claims[claim_id].evidence_ids.remove(artifact_id)
+        self._artifacts[artifact_id].claim_ids.remove(claim_id)
 
     def update_belief_of_claim(self, claim_id: int, new_belief: belief_ladder , veridict : dict , actor: actor_kinds):
         # in order to update the belief we need a veridct confirmation from the kernel
