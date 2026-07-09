@@ -617,7 +617,7 @@ def ratify_with_user(spec):
  
 if __name__ == "__main__":
     from intake import collect_user_query
-    from kernel import assert_spec_ratified
+    from core.kernel import assert_spec_ratified
  
     query = collect_user_query()
     result = formalize(query, max_fields=4)
