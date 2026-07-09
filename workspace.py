@@ -7,6 +7,7 @@ it has 4 containers
 - Provenance log : who wrote that and  when and based on what
 '''
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
@@ -87,6 +88,16 @@ class Workspace:
     next_claim_id: int = 0
     next_artifact_id: int = 0
 
+    def _log_provenance(self, actor: actor_kinds, action: str, target_id: int, target_type: target_types):
+        entry = ProvenanceEntry(
+            timestamp=datetime.now(),
+            actor=actor,
+            action=action,
+            target_id=target_id,
+            target_type=target_type
+        )
+        self._provenance_log.append(entry)
+
     def validate_task_dependencies(self, task: Task):
         for dependency_id in task.depends_on:
             if dependency_id not in self._tasks:
@@ -98,6 +109,7 @@ class Workspace:
         task.id = self.next_task_id
         self._tasks[task.id] = task
         self.next_task_id += 1
+        self._log_provenance(actor="planner", action="add_task", target_id=task.id, target_type="task")
 
     def validate_claim_evidence(self, claim: Claim):
         for evidence_id in claim.evidence_ids:
@@ -109,17 +121,27 @@ class Workspace:
         claim.id = self.next_claim_id
         self._claims[claim.id] = claim
         self.next_claim_id += 1
+        self._log_provenance(actor="planner", action="add_claim", target_id=claim.id, target_type="claim")
 
     def validate_artifact_claims(self, artifact: Artifact):
         for claim_id in artifact.claim_ids:
             if claim_id not in self._claims:
                 raise ValueError(f"Claim with id {claim_id} does not exist.")
+        for evidence_id in artifact.evidence_ids:
+            if evidence_id not in self._artifacts:
+                raise ValueError(f"Evidence artifact with id {evidence_id} does not exist.")
+        for task_id in [artifact.task_id]:
+            if task_id not in self._tasks:
+                raise ValueError(f"Task with id {task_id} does not exist.")
+            
+
             
     def add_artifact(self, artifact: Artifact):
         self.validate_artifact_claims(artifact)
         artifact.id = self.next_artifact_id
         self._artifacts[artifact.id] = artifact
         self.next_artifact_id += 1
+        self._log_provenance(actor="executor", action="add_artifact", target_id=artifact.id, target_type="artifact")
 
     def validate_provenance_entry(self, entry: ProvenanceEntry):
         if entry.target_type == "task" and entry.target_id not in self._tasks:
@@ -143,7 +165,7 @@ class Workspace:
 
     def get_claim(self, claim_id: int) -> Claim:
         try:
-            return self._claims[claim_id]
+            return deepcopy(self._claims[claim_id]) # protection mechanism to avoid external mutation of the internal state
         except KeyError:
             raise ValueError(f"Claim with id {claim_id} does not exist.")
         
@@ -155,4 +177,10 @@ class Workspace:
                              )
     def get_provenance(self , target_type: target_types, target_id: int) -> list[ProvenanceEntry]:
         return [entry for entry in self._provenance_log if entry.target_type == target_type and entry.target_id == target_id]
+    
+    def update_belief_of_claim(self, claim_id: int, new_belief: belief_ladder):
+        if claim_id not in self._claims:
+            raise ValueError(f"Claim with id {claim_id} does not exist.")
+        self._claims[claim_id].belief = new_belief
+        self._log_provenance(actor="evaluator", action=f"update_belief_to_{new_belief}", target_id=claim_id, target_type="claim")
 
