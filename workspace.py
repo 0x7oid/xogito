@@ -11,6 +11,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
+from core.kernel import assert_legal_transition
 
 
 task_kinds = Literal["investigate", "produce", "verify"]
@@ -87,7 +88,7 @@ class Workspace:
     next_task_id: int = 0
     next_claim_id: int = 0
     next_artifact_id: int = 0
-
+# LOGGER FUNCTION ########################################################################################################################
     def _log_provenance(self, actor: actor_kinds, action: str, target_id: int, target_type: target_types):
         entry = ProvenanceEntry(
             timestamp=datetime.now(),
@@ -98,6 +99,7 @@ class Workspace:
         )
         self._provenance_log.append(entry)
 
+# SETTERS AND VALIDATORS ########################################################################################################################
     def validate_task_dependencies(self, task: Task):
         for dependency_id in task.depends_on:
             if dependency_id not in self._tasks:
@@ -155,7 +157,42 @@ class Workspace:
         self.validate_provenance_entry(entry)
         self._provenance_log.append(entry)
 
+    def link_evidence(self , claim_id:int , artifact_id:int):
+        # a bidirectional link between a claim and an artifact
+        # without this function we would have a referential integrity violation between a claim and the artifact
+        if claim_id not in self._claims:
+            raise ValueError(f"Claim with id {claim_id} does not exist.")
+        if artifact_id not in self._artifacts:
+            raise ValueError(f"Artifact with id {artifact_id} does not exist.")
+        
+        self._claims[claim_id].evidence_ids.append(artifact_id)
+        self._artifacts[artifact_id].claim_ids.append(claim_id)
 
+    def update_belief_of_claim(self, claim_id: int, new_belief: belief_ladder , veridict : dict , actor: actor_kinds):
+        # in order to update the belief we need a veridct confirmation from the kernel
+        if claim_id not in self._claims:
+            raise ValueError(f"Claim with id {claim_id} does not exist.")
+        
+        old_belief = self._claims[claim_id].belief
+
+        for evidence_id in veridict.get("evidence_ids", []):
+            if evidence_id not in self._artifacts:
+                raise ValueError(f"Evidence artifact with id {evidence_id} does not exist.")
+    
+        assert_legal_transition(old_belief, new_belief , veridict)
+
+
+        self._claims[claim_id].belief = new_belief
+        self._log_provenance(actor="evaluator", action=f"update_belief_to_{new_belief}", target_id=claim_id, target_type="claim")
+
+
+    def update_task_status(self, task_id: int, new_status: task_statuses):
+        if task_id not in self._tasks:
+            raise ValueError(f"Task with id {task_id} does not exist.")
+        self._tasks[task_id].status = new_status
+        self._log_provenance(actor="executor", action=f"update_task_status_to_{new_status}", target_id=task_id, target_type="task")
+
+# GETTERS ########################################################################################################################
     def get_task(self, task_id: int) -> Task:
         try:
             return self._tasks[task_id]
@@ -178,9 +215,20 @@ class Workspace:
     def get_provenance(self , target_type: target_types, target_id: int) -> list[ProvenanceEntry]:
         return [entry for entry in self._provenance_log if entry.target_type == target_type and entry.target_id == target_id]
     
-    def update_belief_of_claim(self, claim_id: int, new_belief: belief_ladder):
+    def evidence_for_claim(self, claim_id:int):
         if claim_id not in self._claims:
             raise ValueError(f"Claim with id {claim_id} does not exist.")
-        self._claims[claim_id].belief = new_belief
-        self._log_provenance(actor="evaluator", action=f"update_belief_to_{new_belief}", target_id=claim_id, target_type="claim")
+        evidence_ids = self._claims[claim_id].evidence_ids
+        return deepcopy([self.get_artifact(evidence_id) for evidence_id in evidence_ids])
+    
+    def snapshot(self):
+        # this function will be used by the executor
+        return {
+            "tasks": deepcopy(list(self._tasks.values())),
+            "claims": deepcopy(list(self._claims.values())),
+            "artifacts": deepcopy(list(self._artifacts.values())),
+            "provenance_log": deepcopy(self._provenance_log),
+        }
+    
+
 
