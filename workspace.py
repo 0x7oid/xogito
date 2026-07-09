@@ -1,0 +1,158 @@
+'''
+Conceptually this is more like a database
+it has 4 containers
+- Task graph : the tasks with the dependencies (logic to be implmented through the /graph folder and stored here)
+- Artifact store : outputs the executors produce , each with evidence attached to it
+- Belief table : the claims and their current belief ladder position
+- Provenance log : who wrote that and  when and based on what
+'''
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Literal
+
+
+task_kinds = Literal["investigate", "produce", "verify"]
+task_statuses = Literal["pending", "in_progress", "completed", "failed"]
+
+@dataclass
+class Task:
+    id: int
+    description: str
+    kind: task_kinds
+    depends_on : list[int] = field(default_factory=list) # that is a list of ids of the tasks
+    status : task_statuses = "pending"
+
+belief_ladder = Literal["unverified",
+    "supported",
+    "verified",
+    "contested"
+    ]
+
+
+@dataclass
+class Claim:
+    id: int
+    statement: str
+    belief : belief_ladder = "unverified"
+    evidence_ids : list[int] = field(default_factory=list) # that is a list of ids of the artifacts
+
+@dataclass
+class Artifact:
+    id: int
+    task_id: int
+    content: str
+    claim_ids : list[int] = field(default_factory=list) # that is a list of ids of the claims
+    evidence_ids : list[int] = field(default_factory=list) # that is a list of ids of the artifacts
+
+actor_kinds = Literal[
+    "user",
+    "planner",
+    "scheduler",
+    "executor",
+    "evaluator",
+    "adjudicator",
+    "contested",
+    "checkpoint",
+    "compressor",
+]
+
+target_types = Literal[
+    "task",
+    "claim",
+    "artifact",
+]
+
+@dataclass
+class ProvenanceEntry:
+    timestamp: datetime
+    actor : actor_kinds # simply this is the agent who initiated the action
+    action : str
+    target_id : int # this can be for example a task_1 , claim_2, artifact_3 ...
+    target_type : target_types
+
+
+# there is a many to many relationship between claims and artifacts
+
+
+@dataclass
+class Workspace:
+    spec : dict
+    _tasks: dict[int, Task] = field(default_factory=dict)
+    _claims: dict[int, Claim] = field(default_factory=dict)
+    _artifacts: dict[int, Artifact] = field(default_factory=dict)
+    _provenance_log: list[ProvenanceEntry] = field(default_factory=list)
+
+    next_task_id: int = 0
+    next_claim_id: int = 0
+    next_artifact_id: int = 0
+
+    def validate_task_dependencies(self, task: Task):
+        for dependency_id in task.depends_on:
+            if dependency_id not in self._tasks:
+                raise ValueError(f"Dependency task with id {dependency_id} does not exist.")
+            # todo : call for cyclic dependency check here
+
+    def add_task(self, task: Task):
+        self.validate_task_dependencies(task)
+        task.id = self.next_task_id
+        self._tasks[task.id] = task
+        self.next_task_id += 1
+
+    def validate_claim_evidence(self, claim: Claim):
+        for evidence_id in claim.evidence_ids:
+            if evidence_id not in self._artifacts:
+                raise ValueError(f"Evidence artifact with id {evidence_id} does not exist.")
+            
+    def add_claim(self, claim: Claim):
+        self.validate_claim_evidence(claim)
+        claim.id = self.next_claim_id
+        self._claims[claim.id] = claim
+        self.next_claim_id += 1
+
+    def validate_artifact_claims(self, artifact: Artifact):
+        for claim_id in artifact.claim_ids:
+            if claim_id not in self._claims:
+                raise ValueError(f"Claim with id {claim_id} does not exist.")
+            
+    def add_artifact(self, artifact: Artifact):
+        self.validate_artifact_claims(artifact)
+        artifact.id = self.next_artifact_id
+        self._artifacts[artifact.id] = artifact
+        self.next_artifact_id += 1
+
+    def validate_provenance_entry(self, entry: ProvenanceEntry):
+        if entry.target_type == "task" and entry.target_id not in self._tasks:
+            raise ValueError(f"Task with id {entry.target_id} does not exist.")
+        elif entry.target_type == "claim" and entry.target_id not in self._claims:
+            raise ValueError(f"Claim with id {entry.target_id} does not exist.")
+        elif entry.target_type == "artifact" and entry.target_id not in self._artifacts:
+            raise ValueError(f"Artifact with id {entry.target_id} does not exist.")
+        
+    def add_provenance_entry(self, entry: ProvenanceEntry):
+        self.validate_provenance_entry(entry)
+        self._provenance_log.append(entry)
+
+
+    def get_task(self, task_id: int) -> Task:
+        try:
+            return self._tasks[task_id]
+        except KeyError:
+            raise ValueError(f"Task with id {task_id} does not exist.")
+        
+
+    def get_claim(self, claim_id: int) -> Claim:
+        try:
+            return self._claims[claim_id]
+        except KeyError:
+            raise ValueError(f"Claim with id {claim_id} does not exist.")
+        
+    def get_artifact(self, artifact_id: int) -> Artifact:
+        try:
+            return self._artifacts[artifact_id]
+        except KeyError:
+            raise ValueError(f"Artifact with id {artifact_id} does not exist."
+                             )
+    def get_provenance(self , target_type: target_types, target_id: int) -> list[ProvenanceEntry]:
+        return [entry for entry in self._provenance_log if entry.target_type == target_type and entry.target_id == target_id]
+
