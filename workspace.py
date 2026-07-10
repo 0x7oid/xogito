@@ -15,15 +15,19 @@ from core.kernel import assert_legal_transition
 
 
 task_kinds = Literal["investigate", "produce", "verify"]
-task_statuses = Literal["pending", "in_progress", "completed", "failed"]
+task_statuses = Literal["pending", "in_progress", "completed", "failed" , "rejected"]
 
 @dataclass
 class Task:
     id: int
-    description: str
+    description: str = ""
     kind: task_kinds
     depends_on : list[int] = field(default_factory=list) # that is a list of ids of the tasks
     status : task_statuses = "pending"
+    done_when : str = "" # this is a description of the expected output of the task
+    why_now : str = "" # this is a description of the urgency of the task
+    rejection_reason : str = "" # this is a description of the reason for rejection of the task
+
 
 belief_ladder = Literal["unverified",
     "supported",
@@ -35,7 +39,7 @@ belief_ladder = Literal["unverified",
 @dataclass
 class Claim:
     id: int
-    statement: str
+    statement: str = ""
     belief : belief_ladder = "unverified"
     evidence_ids : list[int] = field(default_factory=list) # that is a list of ids of the artifacts
 
@@ -43,7 +47,8 @@ class Claim:
 class Artifact:
     id: int
     task_id: int
-    content: str
+    content: str = ""
+    summary : str = "" # to be used i n the planner later to  reduce context costs
     claim_ids : list[int] = field(default_factory=list) # that is a list of ids of the claims
     evidence_ids : list[int] = field(default_factory=list) # that is a list of ids of the artifacts
 
