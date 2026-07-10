@@ -76,32 +76,41 @@ VALID_KINDS = {"investigate", "produce"}   # planner never proposes "verify"
 # ---------------------------------------------------------------------------
 
 def _build_planning_context(spec, workspace):
+    # this is the reason why we added the summary field to the artifact
+    # class - to reduce context costs for the planner
     snapshot = workspace.snapshot()
 
     completed_lines = []
     rejected_lines = []
+    pending_lines = []
+
     for task in snapshot["tasks"]:
+
         if task.status == "completed":
-            # find this task's artifact summaries (executor wrote them)
-            summaries = [
-                a.summary for a in snapshot["artifacts"] if a.task_id == task.id
-            ]
-            joined = " | ".join(s for s in summaries if s) or "no summary"
+            # collect this task's artifact summaries (the executor wrote them)
+            summaries = []
+            for artifact in snapshot["artifacts"]:
+                if artifact.task_id == task.id and artifact.summary:
+                    summaries.append(artifact.summary)
+
+            if summaries:
+                joined = " | ".join(summaries)
+            else:
+                joined = "no summary"
+
             completed_lines.append(f"- [{task.kind}] {task.description} -> {joined}")
+
         elif task.status == "rejected":
             rejected_lines.append(
                 f"- {task.description} (rejected: {task.rejection_reason})"
             )
 
-    belief_lines = [
-        f"- [{c.belief}] {c.statement}" for c in snapshot["claims"]
-    ]
+        elif task.status in ("pending", "in_progress"):
+            pending_lines.append(f"- [{task.kind}] {task.description}")
 
-    pending_lines = [
-        f"- [{t.kind}] {t.description}"
-        for t in snapshot["tasks"]
-        if t.status in ("pending", "in_progress")
-    ]
+    belief_lines = []
+    for claim in snapshot["claims"]:
+        belief_lines.append(f"- [{claim.belief}] {claim.statement}")
 
     ps = spec["problem_specification"]
     return {
@@ -211,6 +220,9 @@ def _propose_tasks(context):
 # Phase C - validate (pure code, raises loudly)
 # ---------------------------------------------------------------------------
 
+VACUOUS_DONE_WHENS = ("the task is complete", "task is done")
+
+
 def _validate_proposals(proposals, workspace):
     # fuse 1: runaway generation
     if len(proposals) > MAX_TASKS_PER_ITERATION:
@@ -227,26 +239,27 @@ def _validate_proposals(proposals, workspace):
             f"(fuse: {MAX_TOTAL_TASKS}). Possible runaway loop - halting for human review."
         )
 
-    for position, p in enumerate(proposals):
-        if p["kind"] not in VALID_KINDS:
+    for position, proposal in enumerate(proposals):
+
+        if proposal["kind"] not in VALID_KINDS:
             raise ValueError(
-                f"[planner] task {position} has kind {p['kind']!r} - "
+                f"[planner] task {position} has kind {proposal['kind']!r} - "
                 f"only {sorted(VALID_KINDS)} allowed (verify tasks are "
                 "contradiction-triggered later, not planned)."
             )
 
-        done = p["done_when"].strip()
-        if len(done) < 15 or done.lower() in ("the task is complete", "task is done"):
+        done_when = proposal["done_when"].strip()
+        if len(done_when) < 15 or done_when.lower() in VACUOUS_DONE_WHENS:
             raise ValueError(
-                f"[planner] task {position} has a vacuous done_when: {done!r}"
+                f"[planner] task {position} has a vacuous done_when: {done_when!r}"
             )
 
-        for dep in p["depends_on"]:
-            if not (0 <= dep < position):
+        for dependency_index in proposal["depends_on"]:
+            if dependency_index < 0 or dependency_index >= position:
                 # forward or self reference: either reorderable garbage or a
                 # cycle. reject loudly instead of guessing.
                 raise ValueError(
-                    f"[planner] task {position} depends on index {dep} - "
+                    f"[planner] task {position} depends on index {dependency_index} - "
                     "dependencies may only point to EARLIER tasks in the proposal."
                 )
 
@@ -285,11 +298,14 @@ JUDGE_SCHEMA = {
 
 
 def _judge_proposals(proposals, context):
-    listing = "\n".join(
-        f"{i}. [{p['kind']}] {p['description']} "
-        f"(done when: {p['done_when']}; depends on: {p['depends_on']})"
-        for i, p in enumerate(proposals)
-    )
+    listing_lines = []
+    for index, proposal in enumerate(proposals):
+        listing_lines.append(
+            f"{index}. [{proposal['kind']}] {proposal['description']} "
+            f"(done when: {proposal['done_when']}; depends on: {proposal['depends_on']})"
+        )
+    listing = "\n".join(listing_lines)
+
     prompt = (
         "You review proposed tasks against a problem specification and the "
         "work already completed. Judge every task exactly once, by index.\n\n"
@@ -313,18 +329,26 @@ def _judge_proposals(proposals, context):
     judgments = json.loads(ask_llm(prompt, JUDGE_SCHEMA))["judgments"]
 
     # code checks the judge too - never trust, always verify
-    seen = set()
-    for j in judgments:
-        j["label"] = j["label"].strip().lower()
-        if j["label"] not in JUDGE_LABELS:
-            raise ValueError(f"[planner-judge] bad label: {j['label']!r}")
-        if not (0 <= j["index"] < len(proposals)):
-            raise ValueError(f"[planner-judge] bad index: {j['index']}")
-        if j["index"] in seen:
-            raise ValueError(f"[planner-judge] duplicate judgment for index {j['index']}")
-        seen.add(j["index"])
-    if seen != set(range(len(proposals))):
-        raise ValueError(f"[planner-judge] judge skipped tasks: {set(range(len(proposals))) - seen}")
+    seen_indices = set()
+    for judgment in judgments:
+
+        judgment["label"] = judgment["label"].strip().lower()
+        if judgment["label"] not in JUDGE_LABELS:
+            raise ValueError(f"[planner-judge] bad label: {judgment['label']!r}")
+
+        index = judgment["index"]
+        if index < 0 or index >= len(proposals):
+            raise ValueError(f"[planner-judge] bad index: {index}")
+
+        if index in seen_indices:
+            raise ValueError(f"[planner-judge] duplicate judgment for index {index}")
+
+        seen_indices.add(index)
+
+    expected_indices = set(range(len(proposals)))
+    missing_indices = expected_indices - seen_indices
+    if missing_indices:
+        raise ValueError(f"[planner-judge] judge skipped tasks: {missing_indices}")
 
     return judgments
 
@@ -338,39 +362,56 @@ def _judge_proposals(proposals, context):
 # ---------------------------------------------------------------------------
 
 def _insert_tasks(proposals, judgments, workspace):
-    label_by_index = {j["index"]: j for j in judgments}
+    label_by_index = {}
+    for judgment in judgments:
+        label_by_index[judgment["index"]] = judgment
+
     position_to_real_id = {}
     accepted_ids = []
 
-    for position, p in enumerate(proposals):
+    for position, proposal in enumerate(proposals):
         judgment = label_by_index[position]
 
-        # a task depending on a rejected task can't run - reject it too
-        depends_on_rejected = any(
-            label_by_index[dep]["label"] != "sound" or dep not in position_to_real_id
-            for dep in p["depends_on"]
-        ) if p["depends_on"] else False
+        # a task depending on a rejected task can't run - reject it too.
+        # a dependency was rejected if it never made it into the
+        # position_to_real_id map.
+        depends_on_rejected = False
+        for dependency_index in proposal["depends_on"]:
+            if dependency_index not in position_to_real_id:
+                depends_on_rejected = True
+                break
 
-        rejected = judgment["label"] != "sound" or depends_on_rejected
-        reason = (
-            judgment["reason"] if judgment["label"] != "sound"
-            else ("depends on a rejected task" if depends_on_rejected else "")
-        )
+        rejected = (judgment["label"] != "sound") or depends_on_rejected
+
+        if judgment["label"] != "sound":
+            reason = judgment["reason"]
+        elif depends_on_rejected:
+            reason = "depends on a rejected task"
+        else:
+            reason = ""
+
+        if rejected:
+            status = "rejected"
+        else:
+            status = "pending"
 
         task = Task(
             id=0,  # workspace assigns the real id
-            description=p["description"],
-            kind=p["kind"],
+            description=proposal["description"],
+            kind=proposal["kind"],
             depends_on=[],  # filled below for accepted tasks
-            status="rejected" if rejected else "pending",
+            status=status,
         )
-        task.done_when = p["done_when"]
-        task.why_now = p["why_now"]
+        task.done_when = proposal["done_when"]
+        task.why_now = proposal["why_now"]
         task.rejection_reason = reason
 
         if not rejected:
             # translate proposal indices -> real workspace ids
-            task.depends_on = [position_to_real_id[dep] for dep in p["depends_on"]]
+            real_dependency_ids = []
+            for dependency_index in proposal["depends_on"]:
+                real_dependency_ids.append(position_to_real_id[dependency_index])
+            task.depends_on = real_dependency_ids
 
         workspace.add_task(task)
         # add_task assigned the real id; cycles are impossible here because
