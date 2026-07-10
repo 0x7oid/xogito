@@ -235,6 +235,13 @@ class Workspace:
             raise ValueError(f"Claim with id {claim_id} does not exist.")
         evidence_ids = self._claims[claim_id].evidence_ids
         return deepcopy([self.get_artifact(evidence_id) for evidence_id in evidence_ids])
+    def get_ready_tasks(self):
+        # this function will return the tasks that are ready to be executed (i.e. all their dependencies are completed)
+        ready_tasks = []
+        for task in self._tasks.values():
+            if task.status == "pending" and all(self._tasks[dep_id].status == "completed" for dep_id in task.depends_on):
+                ready_tasks.append(deepcopy(task))
+        return ready_tasks
     
     def snapshot(self):
         # this function will be used by the executor
