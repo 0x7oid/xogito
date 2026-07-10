@@ -39,45 +39,31 @@ from core.kernel import assert_spec_ratified
 from graph.workspace import Workspace, Task
 
 
-# ---------------------------------------------------------------------------
-# Fuses. Code-owned. NEVER mentioned in any prompt (a model told "up to
-# 10" drifts toward producing 10). Tripping a fuse is an abnormal halt.
-# Derivations: healthy frontier observed to be 1-5 tasks -> ceiling 2x = 10.
-# Healthy full run ~ 5 iterations x ~3 tasks = 15 -> budget 2x = 30.
-# Revisit both after logging real runs.
-# ---------------------------------------------------------------------------
-
-MAX_TASKS_PER_ITERATION = 10   # runaway-generation fuse
-MAX_TOTAL_TASKS = 30           # runaway-loop / API-cost fuse
-
+MAX_TASKS_PER_ITERATION = 10   
+MAX_TOTAL_TASKS = 30           
+# The llm doesn't know about these fuses, and the planner never proposes more than the minimum
+# this is a mechanism to prevent the llm for generating tasks for sake of generating tasks , no given benefit in return.
 
 class PlannerFuseTripped(Exception):
     # raised to HALT the run and show the human. never caught silently.
     pass
 
 
-# ---------------------------------------------------------------------------
-# Labels the judge may use. Qualitative only - no numbers, ever.
-# ---------------------------------------------------------------------------
-
 JUDGE_LABELS = {"sound", "vague", "duplicate", "invalid_dependency"}
 
-VALID_KINDS = {"investigate", "produce"}   # planner never proposes "verify"
-                                           # (verify tasks are contradiction-
-                                           # triggered, evaluator's job later)
+VALID_KINDS = {"investigate", "produce"} 
+# the kinds of tasks are of threee : investivate , produce , verify
+# verify is for the contradictions only .
 
 
 # ---------------------------------------------------------------------------
 # Phase A - build the planning context (pure code, no LLM)
-#
-# The planner sees STRUCTURED state, never full artifact prose:
-# belief table + one-line summaries. This is the light version of the
-# Compressor - full carry-over compression comes much later.
+
+# this is one of the good reasons we introduced the summary field in the Artifact class: to reduce context costs for the planner
+# the context : summaries of completed tasks, information on pending tasks, information on rejected tasks, and the current belief state of the claims
 # ---------------------------------------------------------------------------
 
 def _build_planning_context(spec, workspace):
-    # this is the reason why we added the summary field to the artifact
-    # class - to reduce context costs for the planner
     snapshot = workspace.snapshot()
 
     completed_lines = []
@@ -112,13 +98,14 @@ def _build_planning_context(spec, workspace):
     for claim in snapshot["claims"]:
         belief_lines.append(f"- [{claim.belief}] {claim.statement}")
 
+    # finally this is the context that will be sent to the planner llm
     ps = spec["problem_specification"]
     return {
         "goal": ps["goal"],
         "constraints": ps["constraints"],
         "success_criteria": ps["success_criteria"],
         "scope": ps["scope"],
-        "anchors": ps["contextual_anchors"],   # verbatim, never reworded
+        "anchors": ps["contextual_anchors"],
         "assumptions": ps["assumptions"],
         "completed": "\n".join(completed_lines) or "(nothing yet - first iteration)",
         "rejected": "\n".join(rejected_lines) or "(none)",
@@ -130,9 +117,9 @@ def _build_planning_context(spec, workspace):
 
 # ---------------------------------------------------------------------------
 # Phase B - propose (LLM call #1)
-#
 # The prompt asks for the MINIMUM frontier. It never sees the fuses,
 # never sees the judge's criteria. Exploration is permitted, not forced.
+# Goodhart's law applied here
 # ---------------------------------------------------------------------------
 
 PROPOSE_SCHEMA = {
@@ -218,6 +205,7 @@ def _propose_tasks(context):
 
 # ---------------------------------------------------------------------------
 # Phase C - validate (pure code, raises loudly)
+# validation in a nutshell includes : checking for max tasks per iteration, checking for max total tasks, checking for valid kinds, checking for vacuous done_when, checking for invalid dependencies
 # ---------------------------------------------------------------------------
 
 VACUOUS_DONE_WHENS = ("the task is complete", "task is done")
@@ -456,3 +444,5 @@ def plan_next_tasks(spec, workspace):
         print("[planner] all proposals rejected this iteration - possible stall")
 
     return accepted_ids
+
+# the other iterations are planned through the orchestrator
