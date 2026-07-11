@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 from core.kernel import assert_legal_transition
+import threading
 
 
 task_kinds = Literal["investigate", "produce", "verify"]
@@ -93,8 +94,12 @@ class Workspace:
     next_task_id: int = 0
     next_claim_id: int = 0
     next_artifact_id: int = 0
+
+    def __post_init__(self):
+        self._owner_thread_id = threading.get_ident()
 # LOGGER FUNCTION ########################################################################################################################
     def _log_provenance(self, actor: actor_kinds, action: str, target_id: int, target_type: target_types):
+        assert threading.get_ident() == self._owner_thread_id
         entry = ProvenanceEntry(
             timestamp=datetime.now(),
             actor=actor,
