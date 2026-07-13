@@ -37,15 +37,16 @@ REQUIRED WORKSPACE EDIT (the tripwire, do it once):
 
 import json
 import time
+from typing import Literal
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from dataclasses import dataclass, field
 
 from llm.client import ask_llm
-from graph.workspace import Workspace, Task, Claim, Artifact
+from workspace import Workspace, Task, Claim, Artifact
 
 
 # ===========================================================================
-# STEP 1 - knobs and fuses. code-owned, never appear in any prompt.
+# PARAMETRES
 # ===========================================================================
 
 MAX_PARALLEL_WORKERS = 4          # how many tasks run at once
@@ -61,18 +62,16 @@ class ExecutorFuseTripped(Exception):
 
 
 # ===========================================================================
-# STEP 2 - the result dataclass. the ONLY thing a worker produces.
-#
-# Task is the assignment (lives in the workspace, part of the graph).
-# ExecutionResult is the report of one attempt (a transient message:
-# travels worker -> integration, then dissolves into artifacts, claims,
-# status and provenance). Entities get one dataclass, messages another.
+
+# tHE workers takes a task + execution context , executes it and returns an execution result object
+# the execution result object is a report of the exectuion of the task
 # ===========================================================================
+POSSIBLE_STATUS = Literal["completed", "failed"]
 
 @dataclass
 class ExecutionResult:
     task_id: int
-    status: str                                    # "completed" or "failed"
+    status: POSSIBLE_STATUS                            # "completed" or "failed"
     content: str = ""                              # the actual work product
     summary: str = ""                              # one line, for future planning
     claim_statements: list = field(default_factory=list)  # asserted facts (strings)
@@ -83,20 +82,18 @@ class ExecutionResult:
 
 
 # ===========================================================================
-# STEP 3 - the execution context (pure code, no LLM).
+# STEP 3 - the execution context of the task (pure code, no LLM).
 #
 # A worker sees ONLY what its one task needs: the task itself, the spec
 # essentials, the belief table, and the FULL content of the tasks it
 # depends on (that content is its input - a summary would not be enough
 # to build on). It never sees rejected tasks, pending tasks, or anything
-# global - that is the planner's context, a different animal.
 # Reads come from snapshot() -> deep copies, so workers hold no live state.
 # ===========================================================================
 
-def build_execution_context(task, spec, workspace):
-    snapshot = workspace.snapshot()
-
+def build_execution_context(task, spec, snapshot):
     dependency_lines = []
+    # for each dependency, find the artifact produced by that task and include its summary and full content in the context
     for dependency_id in task.depends_on:
         for artifact in snapshot["artifacts"]:
             if artifact.task_id == dependency_id:
@@ -107,10 +104,12 @@ def build_execution_context(task, spec, workspace):
                 dependency_lines.append(f"  full output: {artifact.content}")
 
     belief_lines = []
+    # for each claim, include its belief and statement in the context
     for claim in snapshot["claims"]:
         belief_lines.append(f"- [{claim.belief}] {claim.statement}")
 
     ps = spec["problem_specification"]
+    # finally we return the execution context 
     return {
         "task_id": task.id,
         "task_description": task.description,
@@ -186,9 +185,7 @@ def _build_worker_prompt(context):
 
 
 # ===========================================================================
-# STEP 5 - one worker run: LLM call under a timeout, retries with
-# backoff, output shape-checked. Failure is a RESULT. Only programming
-# errors escape this function.
+# STEP 5 - call llm with worker
 # ===========================================================================
 
 def _call_llm_with_timeout(prompt, schema):
@@ -199,8 +196,8 @@ def _call_llm_with_timeout(prompt, schema):
         return future.result(timeout=CALL_TIMEOUT_SECONDS)
 
 
-def execute_task(task, spec, workspace):
-    context = build_execution_context(task, spec, workspace)
+def execute_task(task, spec, snapshot):
+    context = build_execution_context(task, spec, snapshot)
     prompt = _build_worker_prompt(context)
 
     started = time.monotonic()
@@ -280,14 +277,14 @@ def _check_batch_budget(batch_started):
 def execute_batch(tasks, spec, workspace):
     if not tasks:
         return []
-
+    snapshot = workspace.snapshot()
     batch_started = time.monotonic()
     results = []
 
     with ThreadPoolExecutor(max_workers=MAX_PARALLEL_WORKERS) as pool:
         futures = []
         for task in tasks:
-            future = pool.submit(execute_task, task, spec, workspace)
+            future = pool.submit(execute_task, task, spec, snapshot)
             futures.append(future)
 
         for future in futures:
@@ -306,12 +303,8 @@ def _result_task_id(result):
 
 
 # ===========================================================================
-# STEP 7 - integration (SERIAL, main thread only - the single door).
-#
-# The one place execution results become workspace state, through the
-# workspace's normal guarded methods. Claims enter as "unverified":
-# the executor asserts, the evaluator judges later.
-# Called by the scheduler after execute_batch.
+# STEP 7 - integration (SERIAL, main thread only the single door).
+# task execution is parallel, but integration is serial. the workspace is not thread-safe, so we must integrate results one by one in the main thread.
 # ===========================================================================
 
 def integrate_results(results, workspace):
