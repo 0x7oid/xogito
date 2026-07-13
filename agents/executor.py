@@ -40,7 +40,6 @@ import time
 from typing import Literal
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from dataclasses import dataclass, field
-
 from llm.client import ask_llm
 from workspace import Workspace, Task, Claim, Artifact
 
@@ -50,7 +49,6 @@ from workspace import Workspace, Task, Claim, Artifact
 # ===========================================================================
 
 MAX_PARALLEL_WORKERS = 4          # how many tasks run at once
-CALL_TIMEOUT_SECONDS = 300       # one LLM call may not hang forever , 5min max
 MAX_RETRIES = 3                   # attempts per task before it is "failed"
 BACKOFF_BASE_SECONDS = 2          # wait 2s, 4s, 8s between attempts
 BATCH_BUDGET_SECONDS = 1200        #  20 min wall-clock fuse for a whole batch
@@ -188,13 +186,6 @@ def _build_worker_prompt(context):
 # STEP 5 - call llm with worker
 # ===========================================================================
 
-def _call_llm_with_timeout(prompt, schema):
-    # ask_llm is synchronous; bound it by running in a single-use thread
-    # and capping the wait.
-    with ThreadPoolExecutor(max_workers=1) as single:
-        future = single.submit(ask_llm, prompt, schema)
-        return future.result(timeout=CALL_TIMEOUT_SECONDS)
-
 
 def execute_task(task, spec, snapshot):
     context = build_execution_context(task, spec, snapshot)
@@ -205,7 +196,7 @@ def execute_task(task, spec, snapshot):
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            raw = _call_llm_with_timeout(prompt, EXECUTE_SCHEMA)
+            raw = ask_llm(prompt, EXECUTE_SCHEMA)
             output = json.loads(raw)
 
             # never trust, always verify - minimal shape checks
