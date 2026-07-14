@@ -179,6 +179,9 @@ def _build_worker_prompt(context):
         "- 'proposed_tasks': if you notice work that is missing but outside "
         "this task, name it there. Do NOT attempt it yourself.\n"
         "- 'summary': one line, concrete, stating the result (not the effort).\n"
+        "- If your task is an investigation, state WHERE and HOW you searched "
+        "\n{context['scope']}, and report any evidence AGAINST the main finding if you "
+        "encountered it. Do not invent counter-evidence.\n"
     )
 
 
