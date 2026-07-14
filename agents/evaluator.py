@@ -22,8 +22,8 @@ import json
 from dataclasses import dataclass, field
 
 from llm.client import ask_llm
-from workspace import Workspace, belief_ladder
-from model.veridict import Verdict
+from workspace import Workspace   # NOTE: reconcile flat vs graph.workspace layout before orchestrator wiring
+from model.verdict import Verdict  # fixed typo: was model.veridict
 from core.calibration import log_dual_pass_disagreement
 
 
@@ -36,6 +36,7 @@ MAX_VERDICTS_PER_ITERATION = 40
 BELIEF_ORDER = {"unverified": 0, "supported": 1, "verified": 2}
 # contested is more of a flag than a belief order so we exlcude it in this table
 
+VALID_BELIEF_LABELS = ("unverified", "supported", "verified", "contested")
 VALID_EVIDENCE_TYPES = {"empirical", "deductive", "testimonial"}
 
 
@@ -64,8 +65,9 @@ class EvaluationContext:
     done_when: str
     artifact_id: int
     artifact_content: str
-    linked_claims_and_beliefs: dict     # claim_id -> current belief
-    linked_claims_statements: dict      # claim_id -> statement (the llm must read them to judge them)
+    linked_claims: dict   # claim_id -> {"belief": ..., "statement": ...}
+    # one dict , one entry per claim . two parallel dicts keyed by the same
+    # ids was the synced-lists disease again - nothing stopped them drifting
 
 
 def _build_evaluation_contexts(workspace):
@@ -82,35 +84,41 @@ def _build_evaluation_contexts(workspace):
                 continue
 
             # claims linked to this artifact (via the synced evidence lists)
-            linked_beliefs = {}
-            linked_statements = {}
+            linked_claims = {}
             for claim in snapshot["claims"]:
                 if artifact.id in claim.evidence_ids:
-                    linked_beliefs[claim.id] = claim.belief
-                    linked_statements[claim.id] = claim.statement
+                    linked_claims[claim.id] = {
+                        "belief": claim.belief,
+                        "statement": claim.statement,
+                    }
 
             contexts.append(EvaluationContext(
                 task_id=task.id,
                 done_when=task.done_when,
                 artifact_id=artifact.id,
                 artifact_content=artifact.content,
-                linked_claims_and_beliefs=linked_beliefs,
-                linked_claims_statements=linked_statements,
+                linked_claims=linked_claims,
             ))
 
     return contexts
 
 
+def _format_claim_line(claim_id, belief, statement):
+    # the ONE place the claim-line format lives . the belief table and the
+    # per-context listing share presentation , never data
+    return f"- [{claim_id}][{belief}] {statement}"
+
 
 #basically this is a table of claims with their ids and belief labels , for awareness and for contradiction detection
 def _render_belief_table(workspace):
-    # iteration-level view : ALL claims with ids , for awareness and for
-    # contradiction detection . the ids matter - the evaluator must
-    # reference claims in its output
+    # iteration-level view : ALL claims with ids . used by contradiction
+    # detection only now - _propose_verdicts no longer sees it (an evaluator
+    # shown unrelated claims starts judging by coherence with them , which
+    # is plausibility leaking back in)
     snapshot = workspace.snapshot()
     belief_lines = []
     for claim in snapshot["claims"]:
-        belief_lines.append(f"- [{claim.id}][{claim.belief}] {claim.statement}")
+        belief_lines.append(_format_claim_line(claim.id, claim.belief, claim.statement))
     return "\n".join(belief_lines) or "(no claims yet)"
 
 
@@ -118,6 +126,10 @@ def _render_belief_table(workspace):
 # verdict proposal (llm call #1 , one per context)
 # the prompt never sees the gauntlet rules (for bias prevention) , the kernel thresholds or the
 # fuses . graders' rubrics stay invisible to generators
+#
+# prompt style rule : operational definitions , never dispositions . we do
+# not tell the model to "be conservative" (it would perform conservatism) ;
+# we define the labels so tightly that conservatism is the only fit
 # ===========================================================================
 
 VERDICT_SCHEMA = {
@@ -144,8 +156,8 @@ VERDICT_SCHEMA = {
                     },
                     "rationale": {
                         "type": "string",
-                        "description": "One or two sentences: why this evidence "
-                                       "entitles this belief.",
+                        "description": "One or two sentences: which part of the "
+                                       "artifact establishes which part of the claim.",
                     },
                 },
                 "required": ["claim_id", "proposed_belief", "evidence_type",
@@ -159,30 +171,30 @@ VERDICT_SCHEMA = {
 }
 
 
-def _propose_verdicts(context, belief_table):
+def _propose_verdicts(context):
     claim_lines = []
-    for claim_id in context.linked_claims_statements:
-        belief = context.linked_claims_and_beliefs[claim_id]
-        statement = context.linked_claims_statements[claim_id]
-        claim_lines.append(f"- [{claim_id}][{belief}] {statement}")
+    for claim_id in context.linked_claims:
+        entry = context.linked_claims[claim_id]
+        claim_lines.append(_format_claim_line(claim_id, entry["belief"], entry["statement"]))
     claims_listing = "\n".join(claim_lines) or "(this artifact asserted no claims)"
 
     prompt = (
         "You are an evaluation component. Judge whether ONE task's output "
-        "entitles its claims to a change of belief label. Judge only from "
-        "the evidence shown - not from plausibility or your own knowledge.\n\n"
+        "entitles its claims to a change of belief label. Your judgment is "
+        "about what the artifact's text states - not what is plausible, and "
+        "not what you know from elsewhere.\n\n"
         f"It counts as done when: {context.done_when}\n\n"
         f"THE ARTIFACT (id {context.artifact_id}) THIS TASK PRODUCED:\n"
         f"{context.artifact_content}\n\n"
         f"CLAIMS LINKED TO THIS ARTIFACT:\n{claims_listing}\n\n"
-        f"ALL CLAIMS IN THE SYSTEM (for awareness, judge only the linked ones):\n"
-        f"{belief_table}\n\n"
-        "LABELS\n"
-        "- unverified: the evidence does not establish the claim\n"
-        "- supported: the evidence genuinely backs the claim\n"
-        "- verified: the evidence is strong enough that the claim can be "
-        "relied on (be conservative with this)\n"
-        "- contested: the evidence CONTRADICTS the claim\n\n"
+        "LABELS (operational definitions - apply the one that fits)\n"
+        "- unverified: the artifact does not state the claim and the claim "
+        "does not follow from it.\n"
+        "- supported: the artifact states something that backs the claim, "
+        "but parts of the claim go beyond what the artifact establishes.\n"
+        "- verified: the artifact explicitly states the claim, or the claim "
+        "follows from the artifact by a derivation you can trace step by step.\n"
+        "- contested: the artifact states something incompatible with the claim.\n\n"
         "RULES\n"
         "- Judge each linked claim exactly once, by its id.\n"
         "- evidence_type: 'empirical' if the artifact reports observations "
@@ -191,8 +203,8 @@ def _propose_verdicts(context, belief_table):
         "or authority states.\n"
         "- is_negative: true ONLY when the evidence is of the form "
         "'searched and found nothing'.\n"
-        "- If the evidence is thin, say unverified. Do not reward effort, "
-        "volume, or confident wording - only what the evidence shows.\n"
+        "- Judge what the artifact states, not how much text there is or "
+        "how it is phrased.\n"
         "- Also answer whether the artifact satisfies the done-when "
         "condition, with a one-line reason.\n"
     )
@@ -202,7 +214,23 @@ def _propose_verdicts(context, belief_table):
 
 # ===========================================================================
 # proposed verdicts evaluation (code-only)
+#
+# the gauntlet is decomposed one-function-per-check so each gate is
+# auditable at a glance and unit-testable in isolation . the driver below
+# (_run_gauntlet) is just the gates in order .
+#
+# GAUNTLET vs KERNEL : the kernel holds LAWS of the ladder (what the labels
+# mean , forever) ; the gauntlet holds this evaluator's POLICY (tunable
+# quality standards , crude v1 heuristics) . relaxing a gauntlet check
+# lowers standards ; relaxing a kernel rule changes what "verified" means .
 # ===========================================================================
+
+@dataclass
+class CheckResult:
+    verdict_alive: bool
+    proposed_belief: str      # possibly capped by the check
+    note: str = ""            # drop reason or cap annotation
+
 
 def _looks_quantitative(statement):
     # crude v1 heuristic : digits or percent signs in the claim
@@ -222,7 +250,89 @@ def _artifact_states_scope(artifact_content):
     return False
 
 
+def _check_label_sanity(proposed, evidence_type):
+    # code validates the llm's enums , always
+    if proposed not in VALID_BELIEF_LABELS:
+        return CheckResult(False, proposed, f"bad label {proposed!r}")
+    if evidence_type not in VALID_EVIDENCE_TYPES:
+        return CheckResult(False, proposed, f"bad evidence_type {evidence_type!r}")
+    return CheckResult(True, proposed)
+
+
+def _check_evidence_linked(proposed, claim, artifact_id):
+    # the cited evidence must actually be linked to the claim
+    if artifact_id not in claim.evidence_ids:
+        return CheckResult(False, proposed,
+                           f"artifact {artifact_id} is not linked to it")
+    return CheckResult(True, proposed)
+
+
+def _check_tempo(proposed, current_belief, claim_id, promoted_this_iteration):
+    # tempo : one rung at a time , once per iteration .
+    # contested and downward moves always allowed (doubt is free)
+    if proposed in BELIEF_ORDER and current_belief in BELIEF_ORDER:
+        step = BELIEF_ORDER[proposed] - BELIEF_ORDER[current_belief]
+        if step > 1:
+            return CheckResult(False, proposed,
+                               f"{current_belief} -> {proposed} skips a rung")
+        if step == 1 and claim_id in promoted_this_iteration:
+            return CheckResult(False, proposed,
+                               "already promoted this iteration (tempo rule)")
+    return CheckResult(True, proposed)
+
+
+def _check_testimonial_cap(proposed, evidence_type):
+    # testimonial evidence never verifies . pointers alone
+    # cannot make a claim reliable
+    if proposed == "verified" and evidence_type == "testimonial":
+        return CheckResult(True, "supported",
+                           " [capped: testimonial evidence cannot verify]")
+    return CheckResult(True, proposed)
+
+
+def _check_negative_scope(proposed, is_negative, artifact_content):
+    # negative evidence must state its search scope or it
+    # supports nothing (absence of evidence != evidence of absence)
+    if is_negative and proposed in ("supported", "verified"):
+        if not _artifact_states_scope(artifact_content):
+            return CheckResult(False, proposed,
+                               "negative evidence with no stated search scope")
+    return CheckResult(True, proposed)
+
+
+def _check_quantitative_cap(proposed, evidence_type, claim_statement):
+    # quantitative trap : numbers without methodology cap at supported
+    # (sample size / base rate checking is judgment ; the cap is code) .
+    # applies to EMPIRICAL/TESTIMONIAL only - a deductive claim with numbers
+    # ("2^10 = 1024") is checked by re-derivation , not by source-counting ;
+    # without this guard , math-heavy domains could never reach verified
+    if proposed == "verified" and evidence_type != "deductive" \
+            and _looks_quantitative(claim_statement):
+        return CheckResult(True, "supported",
+                           " [capped: quantitative claim, single-source]")
+    return CheckResult(True, proposed)
+
+
+def _check_framing_independence(proposed, claim, artifacts_by_id):
+    # framing independence : verified needs evidence from at
+    # least 2 DIFFERENT tasks (same method = same blind spots)
+    if proposed == "verified":
+        source_task_ids = set()
+        for linked_artifact_id in claim.evidence_ids:
+            linked_artifact = artifacts_by_id.get(linked_artifact_id)
+            if linked_artifact is not None:
+                source_task_ids.add(linked_artifact.task_id)
+        if len(source_task_ids) < 2:
+            return CheckResult(True, "supported",
+                               " [capped: verified needs evidence from 2+ tasks]")
+    return CheckResult(True, proposed)
+
+
 def _run_gauntlet(raw_verdicts, context, workspace, promoted_this_iteration):
+    # the driver : gates in order , cheap existence checks first ,
+    # judgment-adjacent last . a dropped verdict is logged , never fatal .
+    # caps DEMOTE instead of drop - the information survives , the
+    # overreach does not
     snapshot = workspace.snapshot()
 
     claims_by_id = {}
@@ -244,75 +354,46 @@ def _run_gauntlet(raw_verdicts, context, workspace, promoted_this_iteration):
             print(f"[evaluator] dropped verdict: claim {raw['claim_id']} does not exist")
             continue
 
-        # check 2 - label sanity (code validates the llm's enums , always)
         proposed = raw["proposed_belief"].strip().lower()
-        if proposed not in ("unverified", "supported", "verified", "contested"):
-            print(f"[evaluator] dropped verdict on claim {claim.id}: bad label {proposed!r}")
-            continue
-
         evidence_type = raw["evidence_type"].strip().lower()
-        if evidence_type not in VALID_EVIDENCE_TYPES:
-            print(f"[evaluator] dropped verdict on claim {claim.id}: bad evidence_type {evidence_type!r}")
-            continue
 
         # the verdict's evidence is the artifact under evaluation - code
         # decides what counts as evidence , the model only judges
         evidence_ids = [context.artifact_id]
 
-        # check 3 - the cited evidence must actually be linked to the claim
-        if context.artifact_id not in claim.evidence_ids:
-            print(f"[evaluator] dropped verdict on claim {claim.id}: artifact "
-                  f"{context.artifact_id} is not linked to it")
-            continue
-
-        # check 4 - no-op transitions carry no information
+        # check 4 - no-op transitions carry no information (kept inline :
+        # it is a skip , not a drop - nothing to log)
         if proposed == claim.belief:
             continue
 
-        # check 5 - tempo : one rung at a time , once per iteration .
-        # contested and downward moves always allowed (doubt is free)
-        if proposed in BELIEF_ORDER and claim.belief in BELIEF_ORDER:
-            step = BELIEF_ORDER[proposed] - BELIEF_ORDER[claim.belief]
-            if step > 1:
-                print(f"[evaluator] dropped verdict on claim {claim.id}: "
-                      f"{claim.belief} -> {proposed} skips a rung")
-                continue
-            if step == 1 and claim.id in promoted_this_iteration:
-                print(f"[evaluator] dropped verdict on claim {claim.id}: "
-                      "already promoted this iteration (tempo rule)")
-                continue
+        # the drop gates - any failure kills this one verdict
+        drop_gates = [
+            _check_label_sanity(proposed, evidence_type),                              # check 2
+            _check_evidence_linked(proposed, claim, context.artifact_id),              # check 3
+            _check_tempo(proposed, claim.belief, claim.id, promoted_this_iteration),   # check 5
+            _check_negative_scope(proposed, raw["is_negative"], context.artifact_content),  # check 7
+        ]
+        dropped = False
+        for result in drop_gates:
+            if not result.verdict_alive:
+                print(f"[evaluator] dropped verdict on claim {claim.id}: {result.note}")
+                dropped = True
+                break
+        if dropped:
+            continue
 
-        # check 6 - testimonial evidence never verifies . pointers alone
-        # cannot make a claim reliable
-        if proposed == "verified" and evidence_type == "testimonial":
-            proposed = "supported"
-            raw["rationale"] += " [capped: testimonial evidence cannot verify]"
-
-        # check 7 - negative evidence must state its search scope or it
-        # supports nothing (absence of evidence != evidence of absence)
-        if raw["is_negative"] and proposed in ("supported", "verified"):
-            if not _artifact_states_scope(context.artifact_content):
-                print(f"[evaluator] dropped verdict on claim {claim.id}: negative "
-                      "evidence with no stated search scope")
-                continue
-
-        # check 8 - quantitative trap : numbers without methodology cap at
-        # supported (sample size / base rate checking is judgment ; the cap is code)
-        if proposed == "verified" and _looks_quantitative(claim.statement):
-            proposed = "supported"
-            raw["rationale"] += " [capped: quantitative claim, single-source]"
-
-        # check 9 - framing independence : verified needs evidence from at
-        # least 2 DIFFERENT tasks (same method = same blind spots)
-        if proposed == "verified":
-            source_task_ids = set()
-            for linked_artifact_id in claim.evidence_ids:
-                linked_artifact = artifacts_by_id.get(linked_artifact_id)
-                if linked_artifact is not None:
-                    source_task_ids.add(linked_artifact.task_id)
-            if len(source_task_ids) < 2:
-                proposed = "supported"
-                raw["rationale"] += " [capped: verified needs evidence from 2+ tasks]"
+        # the cap gates - never drop , demote and annotate . order matters :
+        # each cap sees the (possibly already-capped) proposed belief
+        cap_gates = [
+            lambda p: _check_testimonial_cap(p, evidence_type),                        # check 6
+            lambda p: _check_quantitative_cap(p, evidence_type, claim.statement),      # check 8
+            lambda p: _check_framing_independence(p, claim, artifacts_by_id),          # check 9
+        ]
+        for gate in cap_gates:
+            result = gate(proposed)
+            if result.proposed_belief != proposed:
+                raw["rationale"] += result.note
+                proposed = result.proposed_belief
 
         # survived - build the real message
         survivors.append(Verdict(
@@ -330,21 +411,28 @@ def _run_gauntlet(raw_verdicts, context, workspace, promoted_this_iteration):
 # ===========================================================================
 # dual-pass (llm call #2 , blind) . PROMOTIONS ONLY .
 # the second pass sees the claim and the evidence - nothing else . not the
-# first pass's rationale , not the proposed label . one question .
-# disagreement kills the promotion and is logged to calibration
+# first pass's rationale , not the proposed label .
+#
+# logic-inversion refinement : instead of a yes/no ("does the evidence
+# support the claim?" - where yes is the agreeable answer and the gate
+# leaks) , we ask for the GAP LIST : every part of the claim the evidence
+# does not state or entail . an empty list IS confirmation . the model's
+# eagerness to produce content now does the strict work , and a padded gap
+# item names something specific - checkable , unlike a padded "no"
 # ===========================================================================
 
 DUAL_PASS_SCHEMA = {
     "type": "object",
     "properties": {
-        "entailed": {
-            "type": "boolean",
-            "description": "true if the evidence actually states or directly "
-                           "entails the claim, false otherwise",
+        "gaps": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Every part of the claim that the evidence does "
+                           "not state or directly entail. Empty if none.",
         },
         "reason": {"type": "string"},
     },
-    "required": ["entailed", "reason"],
+    "required": ["gaps", "reason"],
 }
 
 
@@ -364,14 +452,22 @@ def _dual_pass_confirms(verdict, workspace):
     evidence_block = "\n---\n".join(evidence_texts)
 
     prompt = (
-        "Read the evidence, then the claim. Answer one question: does the "
-        "evidence actually state or directly entail the claim? Judge only "
-        "what is written - not plausibility, not your own knowledge.\n\n"
+        "Read the evidence, then the claim. List every part of the claim "
+        "that the evidence does not state or directly entail. Judge only "
+        "what is written - not plausibility, not your own knowledge.\n"
+        "If the evidence fully states or entails the claim, return an "
+        "empty list.\n\n"
         f"EVIDENCE:\n{evidence_block}\n\n"
         f"CLAIM: {claim_statement}\n"
     )
     result = json.loads(ask_llm(prompt, DUAL_PASS_SCHEMA))
-    return result["entailed"], result["reason"]
+
+    gaps = result["gaps"]
+    if gaps:
+        # the gap list itself is the reason - better calibration data than
+        # a free-text verdict , each item names disputable missing content
+        return False, "gaps: " + "; ".join(gaps)
+    return True, result["reason"]
 
 
 # ===========================================================================
@@ -404,9 +500,10 @@ def _detect_contradictions(belief_table):
     prompt = (
         "Below is a table of claims with ids and belief labels. List every "
         "PAIR of claims that cannot both be true at the same time.\n\n"
-        "- Report only genuine logical or factual conflicts. Different "
-        "emphasis, different scope, or paraphrase is NOT a contradiction.\n"
-        "- If there are none, return an empty list. Do not invent pairs.\n\n"
+        "- A pair qualifies only if asserting both leads to a logical or "
+        "factual impossibility. Different emphasis, different scope, or "
+        "paraphrase is NOT a contradiction.\n"
+        "- An empty list is a valid and common answer.\n\n"
         f"CLAIMS:\n{belief_table}\n"
     )
     result = json.loads(ask_llm(prompt, CONTRADICTION_SCHEMA))
@@ -475,8 +572,6 @@ def evaluate_iteration(spec, workspace):
         print("[evaluator] nothing to evaluate - no completed-task artifacts")
         return {"applied": [], "contested_pairs": [], "done_when_failures": []}
 
-    belief_table = _render_belief_table(workspace)
-
     applied = []
     done_when_failures = []
     promoted_this_iteration = set()
@@ -484,7 +579,7 @@ def evaluate_iteration(spec, workspace):
 
     for context in contexts:
 
-        proposal = _propose_verdicts(context, belief_table)
+        proposal = _propose_verdicts(context)
         total_raw_verdicts += len(proposal["verdicts"])
 
         # fuse : runaway judgment
@@ -512,7 +607,8 @@ def evaluate_iteration(spec, workspace):
 
             # dual-pass gate on promotions only - demotions and contested
             # always pass through (doubt is free)
-            old_belief = context.linked_claims_and_beliefs.get(verdict.claim_id, "")
+            linked_entry = context.linked_claims.get(verdict.claim_id, {})
+            old_belief = linked_entry.get("belief", "")
 
             is_promotion = (
                 verdict.proposed_belief in BELIEF_ORDER
