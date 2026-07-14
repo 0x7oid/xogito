@@ -36,7 +36,7 @@ import json
 
 from llm.client import ask_llm
 from core.kernel import assert_spec_ratified
-from graph.workspace import Workspace, Task
+from workspace import Workspace, Task
 
 
 MAX_TASKS_PER_ITERATION = 10   
@@ -198,6 +198,9 @@ def _propose_tasks(context):
         "- If the success criteria appear satisfiable with current knowledge, "
         "or remaining uncertainty cannot be reduced by investigation, return "
         "an empty task list and explain why in frontier_empty_reason.\n"
+        "- Write done_when outcome-neutrally: 'the presence or absence of X is established'"
+        " - never presupposing the answer.\n"
+
     )
     result = json.loads(ask_llm(prompt, PROPOSE_SCHEMA))
     return result["tasks"], result["frontier_empty_reason"]
@@ -210,7 +213,9 @@ def _propose_tasks(context):
 
 VACUOUS_DONE_WHENS = ("the task is complete", "task is done")
 
-
+'''
+TODO  : no code check yet (detecting leading phrasing in code is unreliable) — instead let the judge catch it: add to the judge prompt's vague label description: "or its done_when presupposes the answer." Zero new labels, reuses existing machinery.
+'''
 def _validate_proposals(proposals, workspace):
     # fuse 1: runaway generation
     if len(proposals) > MAX_TASKS_PER_ITERATION:
