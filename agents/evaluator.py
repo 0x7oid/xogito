@@ -7,13 +7,6 @@ now that the executor integerate the artifcates as unverified , the evaluator wi
 - finally contradiction detection between claims , the resolution of contradiction will be handled by the adjucator (detector vs judge analogy)
 '''
 '''
-now that the executor integrates the artifacts as unverified , the evaluator is responsible for:
-- comparing the delivered artifacts with the done_when in the task
-- belief proposal : an example of that is claim 5 deserves to be supported based on artifact 3 and 4
-    we introduce a new metric here for the evidence , that is the evidence_type since not all evidence are of the same weight
-    for example a theorem is not of the same weight as a saying .
-- finally contradiction detection between claims , the resolution of contradiction will be handled by the adjudicator (detector vs judge analogy)
-
 the evaluator PROPOSES , the kernel PERMITS , the workspace RECORDS.
 every verdict must terminate in something code can check :
 - evidence ids are assigned by CODE (the artifact under evaluation) , never asked from the llm
@@ -30,21 +23,21 @@ from dataclasses import dataclass, field
 
 from llm.client import ask_llm
 from workspace import Workspace, belief_ladder
-from verdict import Verdict
-from calibration import log_dual_pass_disagreement
+from model.veridict import Verdict
+from core.calibration import log_dual_pass_disagreement
 
 
 # ===========================================================================
 # PARAMETRES
 # ===========================================================================
 
-MAX_VERDICTS_PER_ITERATION = 40   # runaway-judgment fuse (~2x healthy max)
+MAX_VERDICTS_PER_ITERATION = 40
 
 BELIEF_ORDER = {"unverified": 0, "supported": 1, "verified": 2}
-# contested is absent on purpose : it is not a rung on the ladder but a flag
-# state - reachable from anywhere , comparable to nothing
+# contested is more of a flag than a belief order so we exlcude it in this table
 
 VALID_EVIDENCE_TYPES = {"empirical", "deductive", "testimonial"}
+
 
 # heuristic scope markers for negative evidence - the artifact must say
 # WHERE/HOW it searched . crude on purpose : v1 checks presence not quality
@@ -108,6 +101,8 @@ def _build_evaluation_contexts(workspace):
     return contexts
 
 
+
+#basically this is a table of claims with their ids and belief labels , for awareness and for contradiction detection
 def _render_belief_table(workspace):
     # iteration-level view : ALL claims with ids , for awareness and for
     # contradiction detection . the ids matter - the evaluator must
@@ -121,7 +116,7 @@ def _render_belief_table(workspace):
 
 # ===========================================================================
 # verdict proposal (llm call #1 , one per context)
-# the prompt never sees the gauntlet rules , the kernel thresholds or the
+# the prompt never sees the gauntlet rules (for bias prevention) , the kernel thresholds or the
 # fuses . graders' rubrics stay invisible to generators
 # ===========================================================================
 
@@ -206,11 +201,7 @@ def _propose_verdicts(context, belief_table):
 
 
 # ===========================================================================
-# the gauntlet (pure code) . every proposal passes or dies HERE ,
-# individually . a dropped verdict is logged , never fatal .
-# order matters : cheap existence checks first , judgment-adjacent last .
-# checks 6 , 8 , 9 DEMOTE instead of drop - the information survives ,
-# the overreach does not
+# proposed verdicts evaluation (code-only)
 # ===========================================================================
 
 def _looks_quantitative(statement):
