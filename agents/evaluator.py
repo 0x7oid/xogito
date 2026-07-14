@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 
 from llm.client import ask_llm
 from workspace import Workspace   # NOTE: reconcile flat vs graph.workspace layout before orchestrator wiring
-from model.verdict import Verdict  # fixed typo: was model.veridict
+from model.veridict import Verdict  # fixed typo: was model.veridict
 from core.calibration import log_dual_pass_disagreement
 
 
