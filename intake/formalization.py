@@ -550,9 +550,30 @@ SPEC_SCHEMA = {
             "items": {"type": "string"},
             "description": "Things taken for granted that were NOT declared by the user. Empty list if none.",
         },
+        "assumption_impacts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "assumption": {"type": "string"},
+                    "impact": {
+                        "type": "string",
+                        "description": "One of: load_bearing, peripheral. "
+                                       "load_bearing means the answer would "
+                                       "change if this assumption were wrong.",
+                    },
+                    "why": {"type": "string"},
+                },
+                "required": ["assumption", "impact", "why"],
+            },
+            "description": "One entry per assumption, same order.",
+        },
     },
-    "required": ["goal", "constraints", "success_criteria", "assumptions"],
+    "required": ["goal", "constraints", "success_criteria", "assumptions",
+                 "assumption_impacts"],
 }
+
+IMPACT_LABELS = ("load_bearing", "peripheral")
 
 
 def _split_anchors(raw_anchors):
@@ -569,6 +590,95 @@ def _split_anchors(raw_anchors):
     return pieces
 
 
+# ---------------------------------------------------------------------------
+# Anchor tracing (pure code, no LLM).
+#
+# FIX: user-declared anchors were copied into the spec verbatim and then
+# silently ignored - nothing checked whether the formalization actually
+# CARRIED them. The "dropped_or_altered" honesty field only ever covered
+# the free-form parts of the prompt, never the anchors. This traces every
+# anchor into the extracted spec text; an anchor whose content words
+# mostly fail to appear anywhere in goal/constraints/criteria/assumptions
+# is a DROPPED anchor and is recorded as such.
+#
+# crude v1 heuristic on purpose (same posture as the evaluator's scope
+# markers): majority content-word overlap checks PRESENCE, not meaning.
+# ---------------------------------------------------------------------------
+
+ANCHOR_TRACE_STOPWORDS = {
+    "the", "a", "an", "is", "are", "was", "were", "be", "of", "to", "in",
+    "on", "for", "and", "or", "not", "no", "it", "this", "that", "with",
+}
+
+
+def _anchor_content_words(anchor):
+    words = []
+    for word in _normalize(anchor).split():
+        if word not in ANCHOR_TRACE_STOPWORDS:
+            words.append(word)
+    return words
+
+
+def _anchor_is_carried(anchor, spec_text):
+    words = _anchor_content_words(anchor)
+    if not words:
+        return True   # an anchor with no content words cannot be traced
+    hits = 0
+    for word in words:
+        if word in spec_text:
+            hits += 1
+    # majority of the anchor's content words must appear somewhere
+    return hits * 2 >= len(words)
+
+
+def trace_anchors(anchors, extracted):
+    joined_parts = [extracted["goal"]]
+    for part_list in (extracted["constraints"], extracted["success_criteria"],
+                      extracted["assumptions"]):
+        for part in part_list:
+            joined_parts.append(part)
+    spec_text = _normalize(" ".join(joined_parts))
+
+    carried = []
+    dropped = []
+    for anchor in anchors:
+        if _anchor_is_carried(anchor, spec_text):
+            carried.append(anchor)
+        else:
+            dropped.append(anchor)
+    return {"carried": carried, "dropped": dropped}
+
+
+def _validate_assumption_impacts(extracted):
+    # code validates the llm's labels , always . an assumption the model
+    # forgot to judge defaults to LOAD-BEARING - an unjudged guess can
+    # never be quietly treated as harmless
+    impacts_by_assumption = {}
+    for entry in extracted["assumption_impacts"]:
+        label = entry["impact"].strip().lower()
+        if label not in IMPACT_LABELS:
+            raise ValueError(f"[spec] bad impact label: {entry['impact']!r}")
+        impacts_by_assumption[entry["assumption"]] = {
+            "impact": label,
+            "why": entry["why"],
+        }
+
+    reviewed = []
+    for assumption in extracted["assumptions"]:
+        entry = impacts_by_assumption.get(assumption)
+        if entry is None:
+            entry = {"impact": "load_bearing",
+                     "why": "the system did not judge this assumption's "
+                            "impact - treated as load-bearing by default"}
+        reviewed.append({
+            "assumption": assumption,
+            "impact": entry["impact"],
+            "why": entry["why"],
+            "user_response": "not asked yet",
+        })
+    return reviewed
+
+
 def build_problem_specification(query, record):
     # this raises on contested / no-structure, so we can't build a spec
     # from an unratified decision - the door stays locked.
@@ -578,7 +688,11 @@ def build_problem_specification(query, record):
         "Extract a problem specification from the problem below, using "
         "the chosen formal framing. Do not invent constraints or criteria "
         "the problem doesn't imply. Anything you had to take for granted "
-        "goes in assumptions.\n\n"
+        "goes in assumptions.\n"
+        "For each assumption, also judge its impact: 'load_bearing' if the "
+        "answer to the problem would change were the assumption wrong, "
+        "'peripheral' otherwise. One impact entry per assumption, with one "
+        "clause of why.\n\n"
         f"Problem: {query.prompt}\n"
         f"Scope: {query.scope or 'not specified'}\n"
         f"Chosen framing ({final['structure_id']}): {final['formal_statement']}\n"
@@ -586,15 +700,22 @@ def build_problem_specification(query, record):
     )
     extracted = json.loads(ask_llm(prompt, SPEC_SCHEMA))
 
+    anchors = _split_anchors(query.contextual_anchors)
+
     return {
         "problem_specification": {
             "goal": extracted["goal"],
             "constraints": extracted["constraints"],
             "success_criteria": extracted["success_criteria"],
             "scope": query.scope or "not specified",
-            "contextual_anchors": _split_anchors(query.contextual_anchors),
+            "contextual_anchors": anchors,
             "assumptions": extracted["assumptions"],
         },
+        # anchors are user-declared GROUND TRUTH ; assumptions are the
+        # system's own guesses . the two must never be presented with the
+        # same confidence , so they are traced and labeled separately here
+        "anchor_trace": trace_anchors(anchors, extracted),
+        "assumption_review": _validate_assumption_impacts(extracted),
         # FIX: the user's ORIGINAL prompt was dropped here - only the
         # formalized goal survived , so the final report could not show
         # what the user actually asked (honesty about framing requires
@@ -607,6 +728,47 @@ def build_problem_specification(query, record):
         "evaluations": record["evaluations"],
         "decision": record["decision"],
     }
+
+def review_assumptions_with_user(spec):
+    # a load-bearing assumption is a DECISION POINT , not a footnote : the
+    # answer flips if the guess is wrong , so the system asks instead of
+    # silently filling the gap . lives here with ratify_with_user because
+    # it is I/O , and it runs BEFORE ratification so the user confirms a
+    # spec whose guesses they have already seen .
+    # dropped anchors are surfaced here too - the user declared them as
+    # fixed facts , so losing one in the framing must never be silent .
+    for dropped in spec["anchor_trace"]["dropped"]:
+        print(f"\nWARNING - your declared fact was NOT carried into the "
+              f"formalization: \"{dropped}\"")
+        print("It will be flagged as a dropped anchor in the final report.")
+
+    for entry in spec["assumption_review"]:
+        if entry["impact"] != "load_bearing":
+            entry["user_response"] = "not asked (peripheral)"
+            continue
+
+        print(f"\nThe system had to GUESS: \"{entry['assumption']}\"")
+        print(f"Why it matters: {entry['why']}")
+        answer = input("Is this guess correct? (yes / no / unsure) > ").strip().lower()
+
+        if answer == "yes":
+            entry["user_response"] = "confirmed by user"
+            # a confirmed guess is a user-declared fact now - promoted to
+            # the anchors , verbatim , so downstream treats it as given
+            spec["problem_specification"]["contextual_anchors"].append(
+                entry["assumption"])
+        elif answer == "no":
+            correction = input("What is actually true? (one line) > ").strip()
+            entry["user_response"] = f"rejected by user; correction: {correction}"
+            if correction:
+                spec["problem_specification"]["contextual_anchors"].append(correction)
+        else:
+            # "unsure" (or anything else) : the guess stays a guess ,
+            # visibly labeled - never silently upgraded to fact
+            entry["user_response"] = "user unsure - remains an unconfirmed guess"
+
+    return spec
+
 
 def ratify_with_user(spec):
     # does the actual asking - lives here, not in kernel, because this
