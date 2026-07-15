@@ -21,23 +21,26 @@ every verdict must terminate in something code can check :
 import json
 from dataclasses import dataclass, field
 
-from llm.client import ask_llm
+from llm.client import ask_llm, ask_llm_voted, vote_split_tier
 from workspace import Workspace   # NOTE: reconcile flat vs graph.workspace layout before orchestrator wiring
-from model.veridict import Verdict  # fixed typo: was model.veridict
-from core.calibration import log_dual_pass_disagreement
+# (layout reconciled : workspace stays a root-level module , see orchestrator.py header)
+from model.verdict import Verdict  # fixed typo: was model.veridict
+from core.calibration import log_dual_pass_disagreement, log_promotion_applied, log_vote_split
 
 
 # ===========================================================================
 # PARAMETRES
 # ===========================================================================
 
-MAX_VERDICTS_PER_ITERATION = 40
-
-BELIEF_ORDER = {"unverified": 0, "supported": 1, "verified": 2}
-# contested is more of a flag than a belief order so we exlcude it in this table
-
-VALID_BELIEF_LABELS = ("unverified", "supported", "verified", "contested")
-VALID_EVIDENCE_TYPES = {"empirical", "deductive", "testimonial"}
+# fuses and shared vocabularies moved to parametres.py - one file owns
+# every constant , and no prompt can ever see them
+from parametres import (
+    MAX_VERDICTS_PER_ITERATION,
+    BELIEF_ORDER,
+    VALID_BELIEF_LABELS,
+    VALID_EVIDENCE_TYPES,
+    VOTING_N,
+)
 
 
 # heuristic scope markers for negative evidence - the artifact must say
@@ -70,8 +73,13 @@ class EvaluationContext:
     # ids was the synced-lists disease again - nothing stopped them drifting
 
 
-def _build_evaluation_contexts(workspace):
+def _build_evaluation_contexts(workspace, new_artifact_ids=None):
     # one context per completed task . pure code , no llm
+    # FIX: without a filter , every completed task from every PAST iteration
+    # was re-judged each time - burning the verdict fuse for nothing and
+    # re-litigating settled claims . the orchestrator passes the ids of the
+    # artifacts integrated THIS iteration ; None still means "everything"
+    # so the function keeps working standalone
     snapshot = workspace.snapshot()
     contexts = []
 
@@ -81,6 +89,8 @@ def _build_evaluation_contexts(workspace):
 
         for artifact in snapshot["artifacts"]:
             if artifact.task_id != task.id:
+                continue
+            if new_artifact_ids is not None and artifact.id not in new_artifact_ids:
                 continue
 
             # claims linked to this artifact (via the synced evidence lists)
@@ -208,6 +218,9 @@ def _propose_verdicts(context):
         "- Also answer whether the artifact satisfies the done-when "
         "condition, with a one-line reason.\n"
     )
+    # SEAM: verdict proposal stays single-call for now . it can opt into
+    # ask_llm_voted later by extracting a label per (claim_id ,
+    # proposed_belief) pair - the swap happens HERE and only here
     result = json.loads(ask_llm(prompt, VERDICT_SCHEMA))
     return result
 
@@ -395,6 +408,15 @@ def _run_gauntlet(raw_verdicts, context, workspace, promoted_this_iteration):
                 raw["rationale"] += result.note
                 proposed = result.proposed_belief
 
+        # FIX: a verified verdict that cites only the artifact under
+        # evaluation can never satisfy the kernel's 2-evidence law , even
+        # though the claim itself holds evidence from 2+ tasks (the framing
+        # independence cap guarantees that) . for verified , code cites the
+        # claim's full linked evidence - still artifact ids only , still
+        # assigned by code , never asked from the llm
+        if proposed == "verified":
+            evidence_ids = list(claim.evidence_ids)
+
         # survived - build the real message
         survivors.append(Verdict(
             claim_id=claim.id,
@@ -436,6 +458,15 @@ DUAL_PASS_SCHEMA = {
 }
 
 
+def _extract_dual_pass_label(response_text):
+    # the label a vote is counted on : an empty gap list IS a pass .
+    # labels only - the voting machinery never reads the gap content
+    result = json.loads(response_text)
+    if result["gaps"]:
+        return "fail"
+    return "pass"
+
+
 def _dual_pass_confirms(verdict, workspace):
     snapshot = workspace.snapshot()
 
@@ -460,7 +491,17 @@ def _dual_pass_confirms(verdict, workspace):
         f"EVIDENCE:\n{evidence_block}\n\n"
         f"CLAIM: {claim_statement}\n"
     )
-    result = json.loads(ask_llm(prompt, DUAL_PASS_SCHEMA))
+    # self-consistency voting at the promotion gate : n blind samples ,
+    # majority on the pass/fail label . a non-unanimous vote is itself
+    # calibration data - logged as a label tier , never a ratio
+    majority_label, split, winning_response = ask_llm_voted(
+        prompt, DUAL_PASS_SCHEMA, _extract_dual_pass_label, VOTING_N,
+    )
+    tier = vote_split_tier(split)
+    if tier != "unanimous":
+        log_vote_split("evaluator_dual_pass", tier, majority_label)
+
+    result = json.loads(winning_response)
 
     gaps = result["gaps"]
     if gaps:
@@ -506,6 +547,9 @@ def _detect_contradictions(belief_table):
         "- An empty list is a valid and common answer.\n\n"
         f"CLAIMS:\n{belief_table}\n"
     )
+    # SEAM: contradiction detection stays single-call for now . it can opt
+    # into ask_llm_voted later by voting per-pair on "contradiction /
+    # not-contradiction" labels - the swap happens HERE and only here
     result = json.loads(ask_llm(prompt, CONTRADICTION_SCHEMA))
     return result["pairs"]
 
@@ -565,8 +609,8 @@ def handle_contradictions(workspace):
 # integrates . returns everything the checkpoint will want to see
 # ===========================================================================
 
-def evaluate_iteration(spec, workspace):
-    contexts = _build_evaluation_contexts(workspace)
+def evaluate_iteration(spec, workspace, new_artifact_ids=None):
+    contexts = _build_evaluation_contexts(workspace, new_artifact_ids)
 
     if not contexts:
         print("[evaluator] nothing to evaluate - no completed-task artifacts")
@@ -647,6 +691,10 @@ def evaluate_iteration(spec, workspace):
 
             if is_promotion:
                 promoted_this_iteration.add(verdict.claim_id)
+                # FIX: log_promotion_applied was never called - the
+                # denominator of every calibration rate was missing .
+                # logged RIGHT AFTER the single-door write succeeds
+                log_promotion_applied(verdict)
             applied.append(verdict_record)
 
     # contradiction pass runs AFTER verdicts so it sees the updated table

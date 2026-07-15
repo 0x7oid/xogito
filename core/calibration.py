@@ -38,14 +38,9 @@ import json
 import time
 import os
 
-
-# one file , json-lines format : one entry per line , append and forget .
-# anchored to this file's location , NEVER the current working directory -
-# a cwd-relative path would silently split the cross-run history into
-# multiple files depending on where python was launched from
-CALIBRATION_LOG_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "..", "calibration_log.jsonl"
-)
+# the log path lives in parametres.py now (still anchored to the project
+# root , never the current working directory)
+from parametres import CALIBRATION_LOG_PATH
 
 
 # the outcome vocabulary . labels not numbers , same as everywhere else
@@ -58,6 +53,10 @@ OUTCOME_KINDS = (
     "adjudicator_confirmed",      # a promoted claim survived its fight
     "contradiction_dismissed",    # flagged pair judged not a real contradiction
     "contradiction_confirmed",    # flagged pair was a real fight
+    "vote_split",                 # a self-consistency vote was not unanimous -
+                                  # the judgment site was genuinely uncertain .
+                                  # tier is a label ("majority" / "split") ,
+                                  # never a ratio - no arithmetic downstream
 )
 
 
@@ -115,6 +114,19 @@ def log_adjudication_outcome(claim_id, evidence_type, overturned, reason):
     })
 
 
+def log_vote_split(site, tier, majority_label):
+    # called by a voted judgment site (dual-pass , entailment gate) when
+    # the vote was NOT unanimous . site names WHERE the disagreement
+    # happened ; tier is the label form of the split ("majority" or
+    # "split") ; majority_label is what the vote settled on anyway
+    _append_entry({
+        "kind": "vote_split",
+        "site": site,
+        "tier": tier,
+        "majority_label": majority_label,
+    })
+
+
 def log_contradiction_outcome(claim_id_a, claim_id_b, was_real, reason):
     # called by the adjudicator after examining a flagged pair :
     # was_real=False -> the detector saw a ghost (paraphrase , scope difference)
@@ -137,10 +149,12 @@ def read_calibration_summary():
     # warning , never a crash - the read side is as crash-tolerant as the
     # write side claims to be
     if not os.path.exists(CALIBRATION_LOG_PATH):
-        return {"total_entries": 0, "by_kind": {}, "by_evidence_type": {}}
+        return {"total_entries": 0, "by_kind": {}, "by_evidence_type": {},
+                "vote_splits_by_tier": {}}
 
     by_kind = {}
     by_evidence_type = {}
+    vote_splits_by_tier = {}
     total = 0
 
     with open(CALIBRATION_LOG_PATH, "r") as log_file:
@@ -168,8 +182,17 @@ def read_calibration_summary():
                     by_evidence_type[evidence_type][kind] = 0
                 by_evidence_type[evidence_type][kind] += 1
 
+            # vote splits also count per tier - label tiers only , the
+            # report and checkpoint never do arithmetic on these
+            if kind == "vote_split":
+                tier = entry.get("tier", "unknown")
+                if tier not in vote_splits_by_tier:
+                    vote_splits_by_tier[tier] = 0
+                vote_splits_by_tier[tier] += 1
+
     return {
         "total_entries": total,
         "by_kind": by_kind,
         "by_evidence_type": by_evidence_type,
+        "vote_splits_by_tier": vote_splits_by_tier,
     }

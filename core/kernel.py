@@ -25,7 +25,10 @@ def assert_legal_transition(old_belief: str, new_belief: str , veridict: dict):
         raise ValueError(f"Illegal belief transition from {old_belief} to {new_belief}")
     # moving up costs evidence , moving down is cheap
     if old_belief == "unverified" and new_belief == "supported":
-        if not veridict.get("evidence"):
+        # FIX: was veridict.get("evidence") but every verdict dict in the
+        # codebase carries "evidence_ids" - the old key never existed , so
+        # every unverified->supported promotion would have been rejected
+        if not veridict.get("evidence_ids"):
             raise ValueError(f"Cannot move from {old_belief} to {new_belief} without evidence")
     if new_belief == "verified":
         evidence = veridict.get("evidence_ids", [])
