@@ -17,7 +17,11 @@ number, so it never nudges itself toward hitting it.
 import json
 
 from llm.client import ask_llm
-from intake import UserQuery
+# FIX: was `from intake import UserQuery` - that resolves to the intake
+# PACKAGE , not the module , and only worked by accident from inside the
+# folder . the chosen layout (see orchestrator.py header) runs everything
+# from the project root , so the module path is intake.intake
+from intake.intake import UserQuery
 
 
 # ---------------------------------------------------------------------------
@@ -591,6 +595,11 @@ def build_problem_specification(query, record):
             "contextual_anchors": _split_anchors(query.contextual_anchors),
             "assumptions": extracted["assumptions"],
         },
+        # FIX: the user's ORIGINAL prompt was dropped here - only the
+        # formalized goal survived , so the final report could not show
+        # what the user actually asked (honesty about framing requires
+        # both) . copied verbatim , never reworded
+        "problem": query.prompt,
         "structure_id": final["structure_id"],
         "characteristics": record["characteristics"],
         "selection": record["selection"],
@@ -616,7 +625,7 @@ def ratify_with_user(spec):
  
  
 if __name__ == "__main__":
-    from intake import collect_user_query
+    from intake.intake import collect_user_query
     from core.kernel import assert_spec_ratified
  
     query = collect_user_query()

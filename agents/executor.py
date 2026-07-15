@@ -48,10 +48,14 @@ from workspace import Workspace, Task, Claim, Artifact
 # PARAMETRES
 # ===========================================================================
 
-MAX_PARALLEL_WORKERS = 4          # how many tasks run at once
-MAX_RETRIES = 3                   # attempts per task before it is "failed"
-BACKOFF_BASE_SECONDS = 2          # wait 2s, 4s, 8s between attempts
-BATCH_BUDGET_SECONDS = 1200        #  20 min wall-clock fuse for a whole batch
+# the fuses moved to parametres.py (their explanations moved with them) -
+# one file owns every constant , and no prompt can ever see them
+from parametres import (
+    MAX_PARALLEL_WORKERS,
+    MAX_RETRIES,
+    BACKOFF_BASE_SECONDS,
+    BATCH_BUDGET_SECONDS,
+)
 
 
 class ExecutorFuseTripped(Exception):
@@ -179,8 +183,12 @@ def _build_worker_prompt(context):
         "- 'proposed_tasks': if you notice work that is missing but outside "
         "this task, name it there. Do NOT attempt it yourself.\n"
         "- 'summary': one line, concrete, stating the result (not the effort).\n"
-        "- If your task is an investigation, state WHERE and HOW you searched "
-        "\n{context['scope']}, and report any evidence AGAINST the main finding if you "
+        # FIX: this line was a plain string , not an f-string , so the raw
+        # text "{context['scope']}" leaked verbatim into the prompt . the
+        # scope is already shown under BACKGROUND above - the broken
+        # interpolation is simply removed
+        "- If your task is an investigation, state WHERE and HOW you searched, "
+        "and report any evidence AGAINST the main finding if you "
         "encountered it. Do not invent counter-evidence.\n"
     )
 
@@ -234,7 +242,15 @@ def execute_task(task, spec, snapshot):
                 elapsed_seconds=time.monotonic() - started,
             )
 
-        except (FutureTimeout, ValueError, KeyError, json.JSONDecodeError) as error:
+        except Exception as error:
+            # FIX: the old tuple (FutureTimeout, ValueError, KeyError,
+            # JSONDecodeError) let the google client's own error types
+            # (network failures , http timeouts , rate limits) escape the
+            # retry loop , crash the worker thread and kill the whole
+            # batch - violating "a worker failure is a RESULT, not a
+            # crash" . a hung call is already bounded by the native http
+            # timeout in llm/client.py , so catching broadly here only
+            # converts failures into results , never hides a hang
             last_error = f"attempt {attempt}: {type(error).__name__}: {error}"
             if attempt < MAX_RETRIES:
                 # exponential backoff: 2s, 4s, 8s
@@ -275,7 +291,14 @@ def execute_batch(tasks, spec, workspace):
     batch_started = time.monotonic()
     results = []
 
-    with ThreadPoolExecutor(max_workers=MAX_PARALLEL_WORKERS) as pool:
+    # FIX: the old `with ThreadPoolExecutor(...) as pool:` form made the
+    # budget fuse cosmetic - future.result() blocked with no timeout , and
+    # even on a fuse trip the context-manager exit waited for every hung
+    # worker to return . now each wait is bounded by the REMAINING budget
+    # and the pool is shut down with wait=False in a finally , so tripping
+    # the fuse actually frees the main thread
+    pool = ThreadPoolExecutor(max_workers=MAX_PARALLEL_WORKERS)
+    try:
         futures = []
         for task in tasks:
             future = pool.submit(execute_task, task, spec, snapshot)
@@ -283,8 +306,18 @@ def execute_batch(tasks, spec, workspace):
 
         for future in futures:
             _check_batch_budget(batch_started)
-            result = future.result()
+            remaining_seconds = BATCH_BUDGET_SECONDS - (time.monotonic() - batch_started)
+            try:
+                result = future.result(timeout=remaining_seconds)
+            except FutureTimeout:
+                raise ExecutorFuseTripped(
+                    f"batch exceeded its wall-clock budget "
+                    f"({BATCH_BUDGET_SECONDS}s) while waiting on a worker. "
+                    "Halting for human review."
+                )
             results.append(result)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
     # workers finish in any order; sort ONCE here so integration - and
     # therefore artifact ids and provenance order - is deterministic
@@ -307,7 +340,7 @@ def integrate_results(results, workspace):
     for result in results:
 
         if result.status == "failed":
-            workspace.update_task_status(result.task_id, "failed")
+            workspace.update_task_status(result.task_id, "failed", actor="executor")
             print(f"[executor] task {result.task_id} failed: {result.error}")
             continue
 
@@ -318,7 +351,7 @@ def integrate_results(results, workspace):
             content=result.content,
             summary=result.summary,
         )
-        workspace.add_artifact(artifact)
+        workspace.add_artifact(artifact, actor="executor")
 
         # 2. each asserted claim enters UNVERIFIED and gets linked to the
         #    artifact that asserted it
@@ -328,8 +361,8 @@ def integrate_results(results, workspace):
                 statement=statement,
                 belief="unverified",
             )
-            workspace.add_claim(claim)
-            workspace.link_evidence(claim.id, artifact.id)
+            workspace.add_claim(claim, actor="executor")
+            workspace.link_evidence(claim.id, artifact.id, actor="executor")
 
         # 3. proposed tasks are NOT inserted - the planner is the single
         #    door for the task graph. surfaced here for the record; the
@@ -339,7 +372,7 @@ def integrate_results(results, workspace):
             print(f"[executor] task {result.task_id} proposes further work: {joined}")
 
         # 4. only now does the task count as done
-        workspace.update_task_status(result.task_id, "completed")
+        workspace.update_task_status(result.task_id, "completed", actor="executor")
         integrated_artifact_ids.append(artifact.id)
 
     return integrated_artifact_ids
