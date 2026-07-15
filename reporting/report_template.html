@@ -5,335 +5,533 @@
 <title>Xogito Report</title>
 <style>
   /* self-contained on purpose : no external fonts , stylesheets or
-     scripts - this file must read the same offline as online */
-  body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f2;
-         color: #222; line-height: 1.5; }
-  .page { max-width: 900px; margin: 0 auto; padding: 24px 32px 64px; }
-  h1 { font-size: 26px; border-bottom: 3px solid #222; padding-bottom: 8px; }
-  h2 { font-size: 20px; margin-top: 40px; border-bottom: 1px solid #bbb;
-       padding-bottom: 4px; }
-  h3 { font-size: 15px; margin-bottom: 4px; }
+     scripts - this file must read the same offline as online .
+     severity colors are reserved for actual signal , and each severity
+     looks different : fatal halt (dark red) , dispute (amber) ,
+     finished (green) , stopped early (slate) . */
+  body { font-family: Arial, sans-serif; margin: 0; background: #f7f7f4;
+         color: #222; line-height: 1.55; }
+  .page { max-width: 880px; margin: 0 auto; padding: 28px 32px 72px; }
+  h1 { font-size: 24px; margin-bottom: 4px; }
+  h2 { font-size: 17px; margin: 18px 0 6px; }
+  h3 { font-size: 14px; margin: 12px 0 4px; }
+  p { margin: 6px 0; }
   .muted { color: #666; font-size: 13px; }
-  .card { background: #fff; border: 1px solid #ddd; border-radius: 6px;
-          padding: 12px 16px; margin: 12px 0; }
-  .halted { background: #fbeaea; border: 2px solid #b03030; }
-  table { border-collapse: collapse; width: 100%; margin: 12px 0;
-          background: #fff; font-size: 14px; }
+
+  /* status banners - different severities look different */
+  .banner { border-radius: 8px; padding: 14px 18px; margin: 18px 0;
+            font-size: 15px; border: 1px solid; }
+  .banner.finished { background: #eaf5ea; border-color: #2c7a2c; }
+  .banner.stopped  { background: #eceff3; border-color: #6b7a8d; }
+  .banner.halted   { background: #f9e3e3; border-color: #8f1d1d;
+                     border-width: 2px; }
+
+  /* the answer block - the first thing a reader should meet */
+  .answer { background: #fff; border: 1px solid #ccc; border-left: 6px solid #2c5a8c;
+            border-radius: 6px; padding: 16px 20px; margin: 16px 0; }
+  .answer .big { font-size: 18px; }
+
+  /* trust warnings - never behind a toggle */
+  .warnbox { background: #fdf3dc; border: 1px solid #c99b2e; border-radius: 6px;
+             padding: 12px 16px; margin: 12px 0; }
+  .dropbox { background: #f9e9e0; border: 1px solid #b06030; border-radius: 6px;
+             padding: 12px 16px; margin: 12px 0; }
+
+  /* stat tiles - counts only , never scores */
+  .tiles { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+  .tile { background: #fff; border: 1px solid #ddd; border-radius: 6px;
+          padding: 8px 14px; min-width: 110px; text-align: center; }
+  .tile .n { font-size: 20px; display: block; }
+  .tile .t { font-size: 12px; color: #666; }
+
+  /* accordion panels - independent details , open several at once */
+  details.panel { background: #fff; border: 1px solid #d8d8d2;
+                  border-radius: 6px; margin: 10px 0; }
+  details.panel > summary { cursor: pointer; padding: 12px 16px;
+                            font-size: 15px; font-weight: bold;
+                            list-style-position: inside; }
+  details.panel > summary .teaser { font-weight: normal; color: #666;
+                                    font-size: 13px; display: block;
+                                    margin-left: 22px; }
+  details.panel > .body { padding: 4px 20px 16px; border-top: 1px solid #eee; }
+  details.panel[open] > summary { border-bottom: 1px solid #eee; }
+
+  /* nested tree nodes for the decision map */
+  details.node { margin: 6px 0 6px 14px; border-left: 3px solid #ccc;
+                 padding-left: 10px; }
+  details.node > summary { cursor: pointer; font-size: 14px; }
+  details.node.resolved { border-left-color: #2c7a2c; }
+  details.node.open     { border-left-color: #c07a1a; }
+  details.node.failed   { border-left-color: #8f1d1d; }
+
+  table { border-collapse: collapse; width: 100%; margin: 10px 0;
+          background: #fff; font-size: 13.5px; }
   th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left;
            vertical-align: top; }
-  th { background: #eee; }
+  th { background: #f0f0ec; }
+
   .label { display: inline-block; padding: 1px 8px; border-radius: 10px;
            font-size: 12px; border: 1px solid #999; background: #f0f0f0; }
   .label.verified   { background: #e2f2e2; border-color: #2c7a2c; }
   .label.supported  { background: #e8eefc; border-color: #3b5bb0; }
   .label.unverified { background: #f4f4f4; border-color: #888; }
-  .label.contested  { background: #fbeaea; border-color: #b03030; }
+  .label.contested  { background: #fdf0dc; border-color: #c07a1a; }
   .flag { display: inline-block; padding: 1px 8px; border-radius: 3px;
           font-size: 12px; background: #fff3d6; border: 1px solid #c99b2e;
           margin-right: 4px; }
   ul { margin: 6px 0; padding-left: 22px; }
-  .side { border-left: 4px solid #999; padding-left: 12px; margin: 8px 0; }
+  .side { border-left: 4px solid #c07a1a; padding-left: 12px; margin: 8px 0; }
 </style>
 </head>
 <body>
 <div class="page">
 
 <h1>Xogito Report</h1>
-<p class="muted">Generated {{ report.generated_at }}.
-Belief positions are qualitative labels; this report contains no numeric
-confidence scores anywhere, by design.</p>
+<p class="muted">Generated {{ report.generated_at }}. Confidence is shown
+as words, never as numbers - counts here are counts, not scores.</p>
+
+<!-- ============ ALWAYS VISIBLE : status , question , answer ============ -->
 
 {% if report.run_health.halted_by_fuse %}
-<div class="card halted">
-  <h3>This run was halted by a fuse</h3>
-  <p>{{ report.run_health.halted_by_fuse }}</p>
-  <p>The audit trail below is complete up to the halt.</p>
+<div class="banner halted"><strong>{{ report.status_plain }}</strong></div>
+{% elif report.headline.finished %}
+<div class="banner finished"><strong>{{ report.status_plain }}</strong></div>
+{% else %}
+<div class="banner stopped"><strong>{{ report.status_plain }}</strong></div>
+{% endif %}
+
+<h2>Your question</h2>
+<p>{{ report.problem.original_prompt }}</p>
+
+<div class="answer">
+  <h2 style="margin-top:0">The result</h2>
+  {% if report.headline.answer %}
+  <p class="big">{{ report.headline.answer }}</p>
+  {% else %}
+  <p class="big">No specific answer was established.</p>
+  {% endif %}
+  {% if report.headline.answer_note %}
+  <p class="muted">Note: {{ report.headline.answer_note }}.</p>
+  {% endif %}
+</div>
+
+<h2>What happened, in short</h2>
+<p>{{ report.headline.summary }}</p>
+
+{% if report.headline.surviving_claims %}
+<p><strong>The findings that held up</strong> (shown word-for-word, so you
+can check the summary against them):</p>
+<ul>
+  {% for claim in report.headline.surviving_claims %}
+  <li>{{ claim.statement }}
+      <span class="label {{ claim.belief }}">{{ claim.belief }}</span></li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if report.headline.dropped_claims %}
+<p><strong>Considered, but did not hold up:</strong></p>
+<ul>
+  {% for claim in report.headline.dropped_claims %}
+  <li>{{ claim.statement }} <span class="muted">- {{ claim.what_happened }}</span></li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<div class="tiles">
+  <div class="tile"><span class="n">{{ report.headline.statistics.iterations_run }}</span>
+    <span class="t">rounds of work</span></div>
+  <div class="tile"><span class="n">{{ report.headline.statistics.sources_produced }}</span>
+    <span class="t">sources produced</span></div>
+  <div class="tile"><span class="n">{{ report.headline.statistics.claims_by_belief.verified
+        + report.headline.statistics.claims_by_belief.supported }}</span>
+    <span class="t">claims backed by evidence</span></div>
+  <div class="tile"><span class="n">{{ report.headline.statistics.claims_by_belief.contested }}</span>
+    <span class="t">claims under dispute</span></div>
+  <div class="tile"><span class="n">{{ report.headline.statistics.claims_by_belief.unverified }}</span>
+    <span class="t">claims unsupported</span></div>
+</div>
+
+<!-- ==== ALWAYS VISIBLE : things that affect whether to trust this ==== -->
+
+{% if report.trust.dropped_anchors %}
+<div class="dropbox">
+  <h3 style="margin-top:0">Facts you declared that got LOST in translation</h3>
+  <p>You stated these as fixed facts, but they were not carried into the
+  formal version of the problem the system actually worked on. The result
+  may not account for them:</p>
+  <ul>
+    {% for anchor in report.trust.dropped_anchors %}
+    <li>"{{ anchor }}"</li>
+    {% endfor %}
+  </ul>
 </div>
 {% endif %}
 
-<!-- ================= 1. THE PROBLEM ================= -->
-<h2>1. The problem</h2>
-<div class="card">
-  <h3>Original prompt (verbatim)</h3>
-  <p>{{ report.problem.original_prompt }}</p>
-  <h3>Scope</h3>
-  <p>{{ report.problem.scope }}</p>
-  <h3>User-declared anchors (fixed facts, copied verbatim, never reworded)</h3>
-  {% if report.problem.user_declared_anchors %}
-  <ul>{% for anchor in report.problem.user_declared_anchors %}<li>{{ anchor }}</li>{% endfor %}</ul>
-  {% else %}<p class="muted">None declared.</p>{% endif %}
+{% if report.trust.load_bearing_assumptions %}
+<div class="warnbox">
+  <h3 style="margin-top:0">Important guesses the system made</h3>
+  <p>These were not stated by you - the system guessed them to fill gaps,
+  and the result could change if a guess is wrong:</p>
+  <ul>
+    {% for entry in report.trust.load_bearing_assumptions %}
+    <li>"{{ entry.assumption }}"
+        <span class="muted">- why it matters: {{ entry.why }} -
+        your response: {{ entry.user_response }}</span></li>
+    {% endfor %}
+  </ul>
 </div>
-<div class="card">
-  <h3>The ratified formalization</h3>
-  <p><span class="label">{{ report.problem.formalization.selected_structure }}</span></p>
-  <p>{{ report.problem.formalization.formal_statement }}</p>
-  <p><strong>Preserved from the original:</strong>
-     {{ report.problem.formalization.preserved_from_original }}</p>
-  <p><strong>Dropped or altered by the framing:</strong>
-     {{ report.problem.formalization.dropped_or_altered }}</p>
-  <p><strong>Goal as formalized:</strong> {{ report.problem.goal }}</p>
-  {% if report.problem.constraints %}
-  <p><strong>Constraints:</strong></p>
-  <ul>{% for c in report.problem.constraints %}<li>{{ c }}</li>{% endfor %}</ul>
-  {% endif %}
-  {% if report.problem.success_criteria %}
-  <p><strong>Success criteria:</strong></p>
-  <ul>{% for c in report.problem.success_criteria %}<li>{{ c }}</li>{% endfor %}</ul>
-  {% endif %}
-  {% if report.problem.assumptions %}
-  <p><strong>Assumptions the system had to make (not user-declared):</strong></p>
-  <ul>{% for a in report.problem.assumptions %}<li>{{ a }}</li>{% endfor %}</ul>
-  {% endif %}
-</div>
-
-<!-- ================= 2. THE JOURNEY ================= -->
-<h2>2. The journey</h2>
-{% if report.register == "technical" %}
-<p class="muted">Per-iteration trace of the run: what was planned and why
-proposals were rejected, what executed, which belief transitions the
-kernel admitted, which contradictions surfaced and how they were ruled on.</p>
-{% else %}
-<p class="muted">What happened, step by step: the tasks the system chose
-to do (and the ones it turned down, with reasons), what came back, and
-how its confidence in each claim changed as evidence arrived.</p>
 {% endif %}
 
-{% for step in report.journey %}
-<div class="card">
-  <h3>Iteration {{ step.iteration }}</h3>
+<!-- ============ EVERYTHING ELSE : independent panels ============ -->
 
-  {% if step.frontier_empty_reason %}
-  <p><strong>The planner proposed nothing:</strong> {{ step.frontier_empty_reason }}</p>
-  {% endif %}
+<h2 style="margin-top:28px">The details, section by section</h2>
+<p class="muted">Each panel opens independently - open as many as you like.</p>
 
-  {% if step.tasks_planned %}
-  <p><strong>Tasks planned:</strong></p>
-  <ul>
-    {% for task in step.tasks_planned %}
-    <li>[{{ task.kind }}] {{ task.description }}
-        <span class="muted">(done when: {{ task.done_when }})</span></li>
-    {% endfor %}
-  </ul>
-  {% endif %}
+<details class="panel">
+  <summary>Your facts and the system's guesses
+    <span class="teaser">{{ report.teasers.assumptions }}</span></summary>
+  <div class="body">
+    <h3>Facts you declared (kept word-for-word, treated as given)</h3>
+    {% if report.trust.carried_anchors %}
+    <ul>{% for anchor in report.trust.carried_anchors %}<li>"{{ anchor }}" - carried into the work</li>{% endfor %}</ul>
+    {% else %}<p class="muted">None (or none were carried - see the warning above).</p>{% endif %}
+    {% if report.trust.dropped_anchors %}
+    <ul>{% for anchor in report.trust.dropped_anchors %}<li>"{{ anchor }}" - <strong>dropped, see warning above</strong></li>{% endfor %}</ul>
+    {% endif %}
+    <h3>Guesses the system made</h3>
+    {% if report.trust.load_bearing_assumptions or report.trust.peripheral_assumptions %}
+    <ul>
+      {% for entry in report.trust.load_bearing_assumptions %}
+      <li>"{{ entry.assumption }}" - <strong>could change the answer.</strong>
+          {{ entry.why }} <span class="muted">({{ entry.user_response }})</span></li>
+      {% endfor %}
+      {% for entry in report.trust.peripheral_assumptions %}
+      <li>"{{ entry.assumption }}" - minor. {{ entry.why }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="muted">The system recorded no assumptions.</p>{% endif %}
+  </div>
+</details>
 
-  {% if step.tasks_rejected %}
-  <p><strong>Proposals rejected, and why:</strong></p>
-  <ul>
-    {% for task in step.tasks_rejected %}
-    <li>{{ task.description }} &mdash; <em>{{ task.rejection_reason }}</em></li>
-    {% endfor %}
-  </ul>
-  {% endif %}
+<details class="panel">
+  <summary>How your question was framed
+    <span class="teaser">{{ report.teasers.problem_framing }}</span></summary>
+  <div class="body">
+    <p>To work on your question, the system restated it in a more formal
+    shape. Honesty about that translation:</p>
+    <p><strong>Frame used:</strong> {{ report.problem.formalization.selected_structure }}</p>
+    <p><strong>Restated as:</strong> {{ report.problem.formalization.formal_statement }}</p>
+    <p><strong>Kept from your wording:</strong>
+       {{ report.problem.formalization.preserved_from_original }}</p>
+    <p><strong>Dropped or altered by the framing:</strong>
+       {{ report.problem.formalization.dropped_or_altered }}</p>
+    <p><strong>Goal it worked toward:</strong> {{ report.problem.goal }}</p>
+    {% if report.problem.constraints %}
+    <p><strong>Hard limits respected:</strong></p>
+    <ul>{% for c in report.problem.constraints %}<li>{{ c }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if report.problem.success_criteria %}
+    <p><strong>What would count as done:</strong></p>
+    <ul>{% for c in report.problem.success_criteria %}<li>{{ c }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+</details>
 
-  {% if step.tasks_executed %}
-  <p><strong>Tasks executed:</strong></p>
-  <ul>
-    {% for task in step.tasks_executed %}
-    <li>Task {{ task.task_id }}: {{ task.description }}
-        <span class="label">{{ task.status }}</span></li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-
-  {% if step.belief_transitions %}
-  <p><strong>Belief transitions applied (why, not just what):</strong></p>
-  <ul>
-    {% for t in step.belief_transitions %}
-    <li>Claim {{ t.claim_id }} &rarr;
-        <span class="label {{ t.new_belief }}">{{ t.new_belief }}</span>
-        on {{ t.evidence_type }} evidence &mdash; {{ t.rationale }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-
-  {% if step.contradictions_detected %}
-  <p><strong>Contradictions detected:</strong></p>
-  <ul>
-    {% for pair in step.contradictions_detected %}
-    <li>Claims {{ pair.claim_id_a }} and {{ pair.claim_id_b }}: {{ pair.reason }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-
-  {% if step.adjudications %}
-  <p><strong>Adjudications resolved:</strong></p>
-  <ul>
-    {% for ruling in step.adjudications %}
-    <li>Claims {{ ruling.claim_id_a }} vs {{ ruling.claim_id_b }}
-        ({{ ruling.conflict_kind }}): {{ ruling.outcome }}
-        &mdash; decided on the <em>{{ ruling.deciding_tier }}</em> tier</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-
-  {% if step.checkpoint %}
-  <p><strong>Checkpoint:</strong> <span class="label">{{ step.checkpoint.decision }}</span>
-     {{ step.checkpoint.reason }}</p>
-  {% endif %}
-</div>
-{% else %}
-<p class="muted">The loop never completed an iteration.</p>
-{% endfor %}
-
-<!-- ================= 3. THE BELIEF TABLE ================= -->
-<h2>3. The belief table (final)</h2>
-{% if report.register == "technical" %}
-<p class="muted">Every claim with its final label, its evidence chain, and
-its honesty flags. A single-source claim rests on one task's output; a
-testimonial cap means a pointer to an authority backed it, which supports
-but never verifies.</p>
-{% else %}
-<p class="muted">Everything the system currently believes, how strongly,
-and on what evidence &mdash; including honest warnings where the support
-is thinner than the wording of a claim might suggest.</p>
-{% endif %}
-
-<table>
-  <tr><th>Claim</th><th>Belief</th><th>Evidence chain</th><th>Honesty flags</th></tr>
-  {% for row in report.belief_table %}
-  <tr>
-    <td>[{{ row.claim_id }}] {{ row.statement }}</td>
-    <td><span class="label {{ row.belief }}">{{ row.belief }}</span></td>
-    <td>
-      {% for e in row.evidence_chain %}
-      <div>artifact {{ e.artifact_id }}: {{ e.summary }}</div>
-      {% else %}<span class="muted">no evidence linked</span>{% endfor %}
-      {% if row.stated_search_scope %}
-      <div class="muted">Stated search scope: {{ row.stated_search_scope }}</div>
+<details class="panel">
+  <summary>The map of what was explored
+    <span class="teaser">{{ report.teasers.decision_map }}</span></summary>
+  <div class="body">
+    <p><strong>Starting question:</strong> {{ report.decision_map.root_question }}</p>
+    {% for branch in report.decision_map.branches %}
+    <details class="node {{ branch.state }}">
+      <summary>{{ branch.question }}
+        <span class="muted">- {{ branch.sources_checked }} source(s) checked,
+        {{ branch.supporting }} supporting, {{ branch.conflicting }} conflicting,
+        {{ branch.unresolved }} still open
+        {% if branch.state == "resolved" %}(settled){% elif branch.state == "failed" %}(this step failed){% else %}(open){% endif %}</span>
+      </summary>
+      {% if branch.sources %}
+      <p class="muted">Sources this line of inquiry produced:</p>
+      <ul>
+        {% for source in branch.sources %}
+        <li>source {{ source.artifact_id }}: {{ source.summary }}</li>
+        {% endfor %}
+      </ul>
       {% endif %}
-    </td>
-    <td>
-      {% for flag in row.honesty_flags %}<span class="flag">{{ flag }}</span>{% endfor %}
-    </td>
-  </tr>
-  {% else %}
-  <tr><td colspan="4" class="muted">No claims were established.</td></tr>
-  {% endfor %}
-</table>
-
-<!-- ================= 4. CONTESTED & UNRESOLVED ================= -->
-<h2>4. Contested &amp; unresolved</h2>
-<p class="muted">Open fights are shown with both sides and their evidence
-&mdash; never coin-flipped, never hidden.</p>
-
-{% for pair in report.contested_and_unresolved.parked_pairs %}
-<div class="card">
-  <h3>Parked pair</h3>
-  <p><strong>Why it was flagged:</strong> {{ pair.detection_reason }}</p>
-  <p><strong>Why it is parked:</strong> {{ pair.parking_reason }}</p>
-  {% for side in [pair.side_a, pair.side_b] %}
-  <div class="side">
-    <p>[{{ side.claim_id }}]
-       <span class="label {{ side.belief }}">{{ side.belief }}</span>
-       {{ side.statement }}</p>
-    <ul>
-      {% for e in side.evidence %}
-      <li>artifact {{ e.artifact_id }}: {{ e.summary }}</li>
-      {% else %}<li class="muted">no evidence linked</li>{% endfor %}
-    </ul>
+      {% if branch.claims %}
+      <p class="muted">Claims it fed:</p>
+      <ul>
+        {% for claim in branch.claims %}
+        <li>{{ claim.statement }}
+            <span class="label {{ claim.belief }}">{{ claim.belief_plain }}</span></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </details>
+    {% else %}
+    <p class="muted">No lines of inquiry were opened.</p>
+    {% endfor %}
   </div>
-  {% endfor %}
-</div>
-{% endfor %}
+</details>
 
-{% if report.contested_and_unresolved.still_contested_claims %}
-<div class="card">
-  <h3>Claims still contested at the end of the run</h3>
-  {% for side in report.contested_and_unresolved.still_contested_claims %}
-  <div class="side">
-    <p>[{{ side.claim_id }}] {{ side.statement }}</p>
+<details class="panel">
+  <summary>Show how this conclusion was reached
+    <span class="teaser">{{ report.teasers.process }}</span></summary>
+  <div class="body">
+    {% for step in report.journey %}
+    <h3>Round {{ step.iteration }}</h3>
+    {% if step.frontier_empty_reason %}
+    <p><strong>Nothing new was planned:</strong> {{ step.frontier_empty_reason }}</p>
+    {% endif %}
+    {% if step.tasks_planned %}
+    <p><strong>Work planned:</strong></p>
     <ul>
-      {% for e in side.evidence %}
-      <li>artifact {{ e.artifact_id }}: {{ e.summary }}</li>
-      {% else %}<li class="muted">no evidence linked</li>{% endfor %}
+      {% for task in step.tasks_planned %}
+      <li>{{ task.description }}
+          <span class="muted">(expected result: {{ task.done_when }})</span></li>
+      {% endfor %}
     </ul>
+    {% endif %}
+    {% if step.tasks_rejected %}
+    <p><strong>Ideas turned down, and why:</strong></p>
+    <ul>
+      {% for task in step.tasks_rejected %}
+      <li>{{ task.description }} - <em>{{ task.rejection_reason }}</em></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if step.tasks_executed %}
+    <p><strong>Work done:</strong></p>
+    <ul>
+      {% for task in step.tasks_executed %}
+      <li>{{ task.description }}
+          {% if task.status == "failed" %}<span class="label contested">did not produce a usable result</span>
+          {% else %}<span class="label supported">{{ task.status }}</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if step.belief_transitions %}
+    <p><strong>How confidence changed, and why:</strong></p>
+    <ul>
+      {% for t in step.belief_transitions %}
+      <li>Claim {{ t.claim_id }} became
+          <span class="label {{ t.new_belief }}">{{ t.new_belief_plain }}</span>
+          - {{ t.rationale }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if step.contradictions_detected %}
+    <p><strong>Conflicts found:</strong></p>
+    <ul>
+      {% for pair in step.contradictions_detected %}
+      <li>Claims {{ pair.claim_id_a }} and {{ pair.claim_id_b }}: {{ pair.reason }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if step.adjudications %}
+    <p><strong>Conflicts settled:</strong></p>
+    <ul>
+      {% for ruling in step.adjudications %}
+      <li>Claims {{ ruling.claim_id_a }} vs {{ ruling.claim_id_b }}:
+          {{ ruling.outcome }} <span class="muted">(decided by comparing
+          {{ ruling.deciding_tier }})</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if step.checkpoint %}
+    <p><strong>End of round:</strong> {{ step.checkpoint_plain }}
+       <span class="muted">- {{ step.checkpoint.reason }}</span></p>
+    {% endif %}
+    {% else %}
+    <p class="muted">The loop never completed a round.</p>
+    {% endfor %}
   </div>
-  {% endfor %}
-</div>
-{% endif %}
+</details>
 
-{% if not report.contested_and_unresolved.parked_pairs
-      and not report.contested_and_unresolved.still_contested_claims %}
-<p class="muted">Nothing is left contested or parked.</p>
-{% endif %}
+<details class="panel">
+  <summary>Every claim, with its evidence
+    <span class="teaser">{{ report.teasers.belief_table }}</span></summary>
+  <div class="body">
+    <table>
+      <tr><th>Claim</th><th>Confidence</th><th>Evidence behind it</th><th>Honesty notes</th></tr>
+      {% for row in report.belief_table %}
+      <tr>
+        <td>[{{ row.claim_id }}] {{ row.statement }}</td>
+        <td><span class="label {{ row.belief }}">{{ row.belief_plain }}</span></td>
+        <td>
+          {% for e in row.evidence_chain %}
+          <div>source {{ e.artifact_id }}: {{ e.summary }}</div>
+          {% else %}<span class="muted">no evidence linked</span>{% endfor %}
+          {% if row.stated_search_scope %}
+          <div class="muted">Where it searched: {{ row.stated_search_scope }}</div>
+          {% endif %}
+        </td>
+        <td>
+          {% for flag in row.honesty_flags %}<span class="flag">{{ flag }}</span>{% endfor %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No claims were established.</td></tr>
+      {% endfor %}
+    </table>
+    <p class="muted">"single-source" means one line of work produced all
+    the evidence; "testimonial-capped" means the evidence points at an
+    authority rather than showing the thing itself.</p>
+  </div>
+</details>
 
-<!-- ================= 5. CALIBRATION CONTEXT ================= -->
-<h2>5. Calibration context</h2>
-<p class="muted">This is the system's historical judgment record,
-accumulated across runs. These counts contextualize the confidence labels
-above &mdash; they do not prove them. A promotion count is a track record,
-not a guarantee.</p>
-
-<table>
-  <tr><th>Judgment outcome</th><th>Count</th></tr>
-  {% for kind, count in report.calibration_context.counts_by_kind.items() %}
-  <tr><td>{{ kind }}</td><td>{{ count }}</td></tr>
-  {% else %}
-  <tr><td colspan="2" class="muted">No calibration history yet.</td></tr>
-  {% endfor %}
-</table>
-
-{% if report.calibration_context.counts_by_evidence_type %}
-<h3>By evidence type</h3>
-<table>
-  <tr><th>Evidence type</th><th>Outcome</th><th>Count</th></tr>
-  {% for etype, kinds in report.calibration_context.counts_by_evidence_type.items() %}
-    {% for kind, count in kinds.items() %}
-    <tr><td>{{ etype }}</td><td>{{ kind }}</td><td>{{ count }}</td></tr>
+<details class="panel">
+  <summary>What rests on what
+    <span class="teaser">{{ report.teasers.dependency_map }}</span></summary>
+  <div class="body">
+    {% for claim in report.dependency_map.claims %}
+    <details class="node">
+      <summary>Claim {{ claim.claim_id }} rests on
+        {{ claim.artifact_count }} source(s)
+        {% if claim.shared_with_claims %}
+        <span class="muted">- shares a source with claim(s)
+        {{ claim.shared_with_claims | join(", ") }}</span>{% endif %}
+      </summary>
+      <p class="muted">{{ claim.statement }}</p>
+      <ul>
+        {% for artifact in claim.artifacts %}
+        <li>source {{ artifact.artifact_id }} (from task {{ artifact.task_id }}):
+            {{ artifact.summary }}</li>
+        {% else %}<li class="muted">no sources linked</li>{% endfor %}
+      </ul>
+    </details>
+    {% else %}
+    <p class="muted">No claims to trace.</p>
     {% endfor %}
-  {% endfor %}
-</table>
-{% endif %}
+    {% if report.dependency_map.svg %}
+    <details class="node">
+      <summary>Show the full picture (diagram)</summary>
+      {{ report.dependency_map.svg | safe }}
+    </details>
+    {% endif %}
+  </div>
+</details>
 
-{% if report.calibration_context.vote_splits_by_tier %}
-<h3>Self-consistency vote splits (label tiers)</h3>
-<table>
-  <tr><th>Tier</th><th>Count</th></tr>
-  {% for tier, count in report.calibration_context.vote_splits_by_tier.items() %}
-  <tr><td>{{ tier }}</td><td>{{ count }}</td></tr>
-  {% endfor %}
-</table>
-{% endif %}
-
-<!-- ================= 6. RUN HEALTH ================= -->
-<h2>6. Run health</h2>
-<div class="card {% if report.run_health.halted_by_fuse %}halted{% endif %}">
-  <p><strong>Stop reason:</strong> {{ report.run_health.stop_reason }}</p>
-  <p><strong>Iterations run:</strong> {{ report.run_health.iterations_run }}</p>
-
-  {% if report.run_health.done_when_failures %}
-  <p><strong>done_when failures:</strong></p>
-  <ul>
-    {% for f in report.run_health.done_when_failures %}
-    <li>Task {{ f.task_id }}: {{ f.reason }}</li>
+<details class="panel">
+  <summary>Open disputes
+    <span class="teaser">{{ report.teasers.contested }}</span></summary>
+  <div class="body">
+    <p class="muted">Unsettled disagreements are shown with both sides and
+    their evidence - never decided by a coin flip, never hidden.</p>
+    {% for pair in report.contested_and_unresolved.parked_pairs %}
+    <h3>A dispute that was set aside</h3>
+    <p><strong>Why it was flagged:</strong> {{ pair.detection_reason }}</p>
+    <p><strong>Why it was set aside:</strong> {{ pair.parking_reason }}</p>
+    {% for side in [pair.side_a, pair.side_b] %}
+    <div class="side">
+      <p>[{{ side.claim_id }}] {{ side.statement }}</p>
+      <ul>
+        {% for e in side.evidence %}
+        <li>source {{ e.artifact_id }}: {{ e.summary }}</li>
+        {% else %}<li class="muted">no evidence linked</li>{% endfor %}
+      </ul>
+    </div>
     {% endfor %}
-  </ul>
-  {% endif %}
-
-  {% if report.run_health.unaddressed_propagation_flags %}
-  <p><strong>Propagation flags left unaddressed:</strong></p>
-  <ul>
-    {% for flag in report.run_health.unaddressed_propagation_flags %}
-    <li>{{ flag.cause }}
-        {% if flag.claim_id is defined %}(claim {{ flag.claim_id }}){% endif %}
-        {% if flag.artifact_id is defined %}(artifact {{ flag.artifact_id }}){% endif %}</li>
     {% endfor %}
-  </ul>
-  {% endif %}
-
-  {% if report.run_health.warnings %}
-  <p><strong>Warning signals collected by the checkpoint:</strong></p>
-  <ul>
-    {% for w in report.run_health.warnings %}
-    <li>[{{ w.signal }}] {{ w.detail }}</li>
+    {% if report.contested_and_unresolved.still_contested_claims %}
+    <h3>Claims still under dispute at the end</h3>
+    {% for side in report.contested_and_unresolved.still_contested_claims %}
+    <div class="side">
+      <p>[{{ side.claim_id }}] {{ side.statement }}</p>
+      <ul>
+        {% for e in side.evidence %}
+        <li>source {{ e.artifact_id }}: {{ e.summary }}</li>
+        {% else %}<li class="muted">no evidence linked</li>{% endfor %}
+      </ul>
+    </div>
     {% endfor %}
-  </ul>
-  {% endif %}
-</div>
+    {% endif %}
+    {% if not report.contested_and_unresolved.parked_pairs
+          and not report.contested_and_unresolved.still_contested_claims %}
+    <p class="muted">Nothing is left disputed or set aside.</p>
+    {% endif %}
+  </div>
+</details>
 
-<p class="muted">End of report. Every state change behind this document is
-in the workspace provenance log; every judgment outcome is in the
-calibration log.</p>
+<details class="panel">
+  <summary>The system's track record
+    <span class="teaser">{{ report.teasers.calibration }}</span></summary>
+  <div class="body">
+    <p class="muted">How this system's past judgments have turned out,
+    across all runs. This history gives context to the confidence words
+    above - it does not prove them right.</p>
+    <table>
+      <tr><th>What happened</th><th>Count</th></tr>
+      {% for kind, count in report.calibration_context.counts_by_kind.items() %}
+      <tr><td>{{ kind }}</td><td>{{ count }}</td></tr>
+      {% else %}
+      <tr><td colspan="2" class="muted">No history yet.</td></tr>
+      {% endfor %}
+    </table>
+    {% if report.calibration_context.counts_by_evidence_type %}
+    <h3>By kind of evidence</h3>
+    <table>
+      <tr><th>Evidence kind</th><th>Outcome</th><th>Count</th></tr>
+      {% for etype, kinds in report.calibration_context.counts_by_evidence_type.items() %}
+        {% for kind, count in kinds.items() %}
+        <tr><td>{{ etype }}</td><td>{{ kind }}</td><td>{{ count }}</td></tr>
+        {% endfor %}
+      {% endfor %}
+    </table>
+    {% endif %}
+    {% if report.calibration_context.vote_splits_by_tier %}
+    <h3>When the system's own checks disagreed with each other</h3>
+    <table>
+      <tr><th>How split</th><th>Count</th></tr>
+      {% for tier, count in report.calibration_context.vote_splits_by_tier.items() %}
+      <tr><td>{{ tier }}</td><td>{{ count }}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </div>
+</details>
+
+<details class="panel">
+  <summary>Run health
+    <span class="teaser">{{ report.teasers.run_health }}</span></summary>
+  <div class="body">
+    <p><strong>Why the run ended:</strong> {{ report.run_health.stop_reason_plain }}</p>
+    <p class="muted">Technical detail: {{ report.run_health.stop_reason }}</p>
+    <p><strong>Rounds of work:</strong> {{ report.run_health.iterations_run }}</p>
+    {% if report.run_health.done_when_failures %}
+    <p><strong>Steps that did not deliver what was expected:</strong></p>
+    <ul>
+      {% for f in report.run_health.done_when_failures %}
+      <li>Task {{ f.task_id }}: {{ f.reason }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if report.run_health.unaddressed_propagation_flags %}
+    <p><strong>Loose ends from settled disputes</strong> (claims or sources
+    that may need a second look and have not had one):</p>
+    <ul>
+      {% for flag in report.run_health.unaddressed_propagation_flags %}
+      <li>{{ flag.cause }}
+          {% if flag.claim_id is defined %}(claim {{ flag.claim_id }}){% endif %}
+          {% if flag.artifact_id is defined %}(source {{ flag.artifact_id }}){% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if report.run_health.warnings %}
+    <p><strong>Warning signals:</strong></p>
+    <ul>
+      {% for w in report.run_health.warnings %}
+      <li>{{ w.detail }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</details>
+
+<p class="muted" style="margin-top:24px">End of report. Every change of
+state behind this document is in the workspace provenance log; every
+judgment outcome is in the calibration log.</p>
 
 </div>
 </body>

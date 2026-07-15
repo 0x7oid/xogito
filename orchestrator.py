@@ -36,6 +36,7 @@ checkpoint.py
 from intake.formalization import (
     formalize,
     build_problem_specification,
+    review_assumptions_with_user,
     ratify_with_user,
 )
 from core.kernel import assert_spec_ratified
@@ -68,6 +69,9 @@ def run_orchestrator():
         return
 
     spec = build_problem_specification(user_query, record)
+    # load-bearing guesses and dropped anchors go to the USER before
+    # ratification - a wrong guess about the problem flips the answer
+    spec = review_assumptions_with_user(spec)
     spec = ratify_with_user(spec)          # does the asking
     if not spec.get("ratified"):
         print("Stopping - the spec was not ratified.")

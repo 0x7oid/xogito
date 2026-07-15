@@ -252,6 +252,10 @@ def execute_task(task, spec, snapshot):
             # timeout in llm/client.py , so catching broadly here only
             # converts failures into results , never hides a hang
             last_error = f"attempt {attempt}: {type(error).__name__}: {error}"
+            # every retry burns a full llm call , so its cause is never
+            # silent - if schema violations keep showing up here , that is
+            # a quiet token sink worth fixing at the prompt/schema level
+            print(f"[executor] task {task.id} retrying after {last_error}")
             if attempt < MAX_RETRIES:
                 # exponential backoff: 2s, 4s, 8s
                 time.sleep(BACKOFF_BASE_SECONDS ** attempt)
