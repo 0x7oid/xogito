@@ -131,6 +131,7 @@ def _build_problem_section(spec):
         # labeled explicitly as user-declared : the model never wrote these
         "user_declared_anchors": ps["contextual_anchors"],
         "assumptions": ps["assumptions"],
+        "verification_checklist": ps.get("verification_checklist", []),
         "formalization": _describe_formalization(spec),
     }
 

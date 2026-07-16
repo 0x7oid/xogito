@@ -19,7 +19,7 @@ acts on them (acting would make it a judge) , it only carries them .
 '''
 
 from core.calibration import read_calibration_summary
-from parametres import MAX_ITERATIONS, BELIEF_ORDER
+from parametres import MAX_ITERATIONS, BELIEF_ORDER, NEGATION_TOKENS
 
 
 CHECKPOINT_DECISIONS = ("continue", "stop_success", "stop_stall", "stop_budget")
@@ -38,11 +38,23 @@ def decide_checkpoint(spec, workspace, run_log):
     decision = "continue"
     reason = "work remains and progress was made this iteration"
 
-    if _success_heuristic_met(iteration_record, snapshot):
+    # scope fidelity : named sub-questions the user explicitly asked for .
+    # stop_success is refused while any lacks a COMPLETED covering task -
+    # an empty frontier that skipped a named question is not done , it is
+    # incomplete , and the report says which items were dropped
+    uncovered = _uncovered_checklist_items(spec, snapshot)
+
+    if uncovered and _success_heuristic_met(iteration_record, snapshot):
+        decision = "stop_stall"
+        reason = ("frontier exhausted but the run is INCOMPLETE - named "
+                  "checklist items were never covered by a completed task: "
+                  + "; ".join(uncovered))
+    elif _success_heuristic_met(iteration_record, snapshot):
         decision = "stop_success"
         reason = (
-            "frontier empty, no contested claims remain, and at least one "
-            "supported-or-verified claim exists"
+            "frontier exhausted (empty, or every proposal was a duplicate "
+            "of covered ground), no contested claims remain, and at least "
+            "one supported-or-verified claim exists"
         )
     elif _stalled(iteration_record):
         decision = "stop_stall"
@@ -51,11 +63,50 @@ def decide_checkpoint(spec, workspace, run_log):
         decision = "stop_budget"
         reason = f"iteration count reached the budget fuse ({MAX_ITERATIONS})"
 
+    warnings = _collect_warning_signals(run_log)
+    if uncovered and decision != "continue":
+        warnings.append({
+            "signal": "uncovered_checklist_items",
+            "detail": "the user explicitly asked for these and no completed "
+                      "task covered them: " + "; ".join(uncovered),
+        })
+
     return {
         "decision": decision,
         "reason": reason,
-        "warnings": _collect_warning_signals(run_log),
+        "warnings": warnings,
     }
+
+
+def required_coverage(item):
+    # an absence-type item ("zero documented evidence" , "no incidents")
+    # needs TWO independently-worded completed tasks : a single search
+    # that found nothing closes no question , and two searches sharing a
+    # wording share blind spots . detection is the same negation-token
+    # heuristic the corroboration matcher uses
+    lowered = f" {item.lower()} "
+    for token in NEGATION_TOKENS:
+        if f" {token} " in lowered:
+            return 2
+    return 1
+
+
+def _uncovered_checklist_items(spec, snapshot):
+    # pure code : an item is covered when enough COMPLETED tasks claim its
+    # index (two for absence-type items , one otherwise) . pending or
+    # in-progress does not count - the work must be done , and a failed
+    # task un-covers its item again
+    checklist = spec["problem_specification"].get("verification_checklist", [])
+    uncovered = []
+    for index, item in enumerate(checklist):
+        completed_covering = 0
+        for task in snapshot["tasks"]:
+            if (getattr(task, "covers_checklist_item", -1) == index
+                    and task.status == "completed"):
+                completed_covering += 1
+        if completed_covering < required_coverage(item):
+            uncovered.append(item)
+    return uncovered
 
 
 def _success_heuristic_met(iteration_record, snapshot):
@@ -66,7 +117,11 @@ def _success_heuristic_met(iteration_record, snapshot):
     # a per-criterion relevance judgment (llm , code-validated) , plus a
     # coverage table criteria -> claim ids in the report . until then :
     # frontier empty AND no contested claims AND some established claim
-    if not _frontier_was_empty(iteration_record):
+    frontier_exhausted = (
+        _frontier_was_empty(iteration_record)
+        or _all_rejected_as_duplicates(iteration_record, snapshot)
+    )
+    if not frontier_exhausted:
         return False
 
     has_established_claim = False
@@ -78,6 +133,26 @@ def _success_heuristic_met(iteration_record, snapshot):
             has_established_claim = True
 
     return has_established_claim
+
+
+def _all_rejected_as_duplicates(iteration_record, snapshot):
+    # live stress run : a complete investigation ended labeled "stall"
+    # because the planner re-proposed covered ground and the judge
+    # rejected every proposal as a duplicate . all-duplicates IS frontier
+    # exhaustion - nothing new remains to propose . any other rejection
+    # reason (vague , invalid_dependency) stays a stall : those signal
+    # malfunction , not completion . pure code : reads the rejection
+    # reasons the planner recorded on this iteration's tasks
+    created = iteration_record["tasks_created_by_planner"]
+    if created == 0 or iteration_record["accepted_task_ids"]:
+        return False
+    recent_tasks = snapshot["tasks"][-created:]
+    for task in recent_tasks:
+        if task.status != "rejected":
+            return False
+        if "duplicate" not in task.rejection_reason.lower():
+            return False
+    return True
 
 
 def _frontier_was_empty(iteration_record):

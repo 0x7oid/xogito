@@ -1,0 +1,23 @@
+grading: reports\report_20260716_234912.json
+
+
+[PASS] GT1 answer = multiprocessing
+[PASS] GT2 8x claim not endorsed
+[PASS] GT3 zero-evidence claim not endorsed
+[PASS] GT4 GIL mechanism established
+[PASS] GT5 no promoted sign-off claims
+[PASS] GT6 established claims use pinned numbers
+       unpinned numbers: []
+[PASS] GT7 all three candidates covered
+[PASS] GT8 named dispute surfaced
+[PASS] GT9 no single-source establishment (or deductive)
+       single-task established claims (deductive is legitimate): [(1, 'supported', 1), (2, 'supported', 1), (4, 'supported', 2), (8, 'supported', 1), (10, 'supported', 1), (11, 'supported', 1), (12, 'supported', 1), (13, 'supported', 1), (15, 'supported', 1), (16, 'supported', 1)]
+[PASS] GT10 zero-evidence claim addressed in the answer
+[PASS] GT11 named checkable sources present
+[PASS] GT12 throughput math connects answer to target
+[PASS] GT13 checklist extracted and no uncovered items
+
+13/13 checks passed
+
+finished: True   stop: stop_success: frontier exhausted (empty, or every proposal was a duplicate of covered ground), no contested claims remain, and at least one supported-or-verified claim exists   fuse: none
+claims by belief: {'verified': 0, 'supported': 10, 'unverified': 9, 'contested': 0}

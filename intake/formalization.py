@@ -25,66 +25,12 @@ from intake.intake import UserQuery
 
 
 # ---------------------------------------------------------------------------
-# The catalog of formal structures we know about.
-# This is plain data + plain python functions. No LLM involved here.
+# The catalog of formal structures lives in intake/catalog.py - plain data
+# plus pure predicates , importable without touching pipeline logic .
 # ---------------------------------------------------------------------------
 
-def _fits_optimization(c):
-    return c["success_type"] == "graded" and c["solution_uniqueness"] == "unique_best_required"
+from intake.catalog import CHARACTERISTIC_VALUES, STRUCTURE_CATALOG
 
-
-def _fits_csp(c):
-    return c["solution_uniqueness"] == "any_qualifying_ok"
-
-
-def _fits_satisficing(c):
-    return c["solution_uniqueness"] == "any_qualifying_ok" or c["success_type"] == "threshold"
-
-
-def _fits_game_theory(c):
-    return c["stakeholders"] == "multiple_adversarial"
-
-
-def _fits_control_loop(c):
-    return c["temporal_structure"] == "continuous_feedback"
-
-
-STRUCTURE_CATALOG = [
-    {
-        "id": "optimization",
-        "name": "Objective Optimization",
-        "aliases": ["mathematical optimization", "optimization problem", "mathematical programming"],
-        "definition": "Find the input that maximizes or minimizes some function, given constraints.",
-        "applies_if": _fits_optimization,
-    },
-    {
-        "id": "csp",
-        "name": "Constraint Satisfaction",
-        "aliases": ["constraint satisfaction problem", "constraint programming"],
-        "definition": "Find any solution that satisfies a set of requirements. No 'best' needed, just 'good enough'.",
-        "applies_if": _fits_csp,
-    },
-    {
-        "id": "satisficing",
-        "name": "Satisficing",
-        "definition": "Stop as soon as a solution clears a threshold, instead of searching for the best one.",
-        "applies_if": _fits_satisficing,
-    },
-    {
-        "id": "game_theory",
-        "name": "Game-Theoretic",
-        "aliases": ["game theory", "strategic interaction"],
-        "definition": "Several parties with conflicting interests, each reacting to the others.",
-        "applies_if": _fits_game_theory,
-    },
-    {
-        "id": "control_loop",
-        "name": "Control / Feedback Loop",
-        "aliases": ["control theory", "feedback control", "closed loop control"],
-        "definition": "Not a one-shot decision - an ongoing process that keeps adjusting over time.",
-        "applies_if": _fits_control_loop,
-    },
-]
 
 
 # ---------------------------------------------------------------------------
@@ -164,14 +110,6 @@ def resolve_ids(items, allowed_structures, phase):
 # spelled out in the schema descriptions and checked in code after.
 # ---------------------------------------------------------------------------
 
-CHARACTERISTIC_VALUES = {
-    "cardinality": ["single_decision", "batch", "stream"],
-    "stakeholders": ["single", "multiple_aligned", "multiple_adversarial"],
-    "temporal_structure": ["one_shot", "sequential", "continuous_feedback"],
-    "success_type": ["binary", "threshold", "graded"],
-    "solution_uniqueness": ["unique_best_required", "any_qualifying_ok"],
-    "measurability": ["directly_measurable", "proxy_only", "unmeasurable"],
-}
 
 CHARACTERIZE_SCHEMA = {
     "type": "object",
@@ -192,6 +130,24 @@ def characterize_problem(query):
         "knowledge of what formal frameworks might apply - that is a "
         "separate stage you cannot see. For each field, pick exactly one "
         "of the allowed values written in its description.\n\n"
+        "Operational definitions:\n"
+        "- stakeholders: parties whose INTERESTS conflict inside the "
+        "problem itself (competitors, negotiating sides). People who "
+        "merely disagree about what the answer is - advisors, experts, "
+        "colleagues arguing for different options - are NOT adversarial "
+        "stakeholders.\n"
+        "- solution_uniqueness: 'unique_best_required' only when the "
+        "asker needs the single best answer; 'any_qualifying_ok' when "
+        "anything clearing the stated success bar would satisfy them.\n"
+        "- primary_output: what the asker wants handed back. 'decision' "
+        "(which option to take), 'explanation' (why something is "
+        "happening), 'forecast' (what will happen), 'estimate' (how big "
+        "or how many something is right now), 'artifact' (a designed "
+        "thing: a plan, a document, an architecture), 'verdict_on_claims' "
+        "(whether stated claims are true), 'ranking' (many items "
+        "ordered), 'risk_profile' (what could go wrong, how likely, how "
+        "bad). Pick what dominates; a decision that also needs claims "
+        "checked is still 'decision'.\n\n"
         f"Goal: {query.prompt}\n"
         f"Scope: {query.scope or 'not specified'}\n"
         f"Fixed facts: {query.contextual_anchors or 'none'}\n"
@@ -246,14 +202,33 @@ FIT_LABELS = {"fits", "partially fits", "doesn't fit"}
 
 
 def classify_fit(query, candidates):
-    listing = "\n".join(f"- {s['id']}: {s['name']} - {s['definition']}" for s in candidates)
+    listing = "\n".join(
+        f"- {s['id']}: {s['name']} - {s['definition']}"
+        + (f" (example problem: {s['example']})" if s.get("example") else "")
+        for s in candidates
+    )
+    # FIX (live stress run) : classify used to see the prompt ONLY - no
+    # scope , no anchors . a threshold stated in the anchors ("target is
+    # 12,000/hour") is exactly what makes satisficing fit , so hiding the
+    # anchors from this call starved it of the fit signal . label
+    # definitions are operational now for the same reason the evaluator's
+    # are : a bare word invites vibes , a definition invites checking
     prompt = (
         "For each listed structure, judge how well its assumptions actually "
         "hold for this problem. Judge every structure exactly once. Use only "
-        "these labels, no numbers: 'fits', 'partially fits', 'doesn't fit'. "
+        "these labels, no numbers:\n"
+        "- 'fits': solving the problem as this structure defines it would "
+        "directly answer what the asker needs.\n"
+        "- 'partially fits': the structure captures the central decision "
+        "but drops or distorts a secondary aspect.\n"
+        "- 'doesn't fit': solving the structure would not answer the "
+        "problem.\n"
         "It is perfectly fine to label every structure 'doesn't fit' - do "
         "not force a match. Give one clause of justification for each.\n\n"
-        f"Problem: {query.prompt}\n\nStructures:\n{listing}"
+        f"Problem: {query.prompt}\n"
+        f"Scope: {query.scope or 'not specified'}\n"
+        f"Fixed facts: {query.contextual_anchors or 'none'}\n\n"
+        f"Structures:\n{listing}"
     )
     judgments = json.loads(ask_llm(prompt, CLASSIFY_SCHEMA))["judgments"]
     judgments = resolve_ids(judgments, candidates, "classify_fit")
@@ -699,6 +674,51 @@ def _validate_assumption_impacts(extracted):
     return reviewed
 
 
+CHECKLIST_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "items": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Every EXPLICITLY named sub-question or claim the "
+                           "user asked to verify, decide, or check - one per "
+                           "string, in the user's own framing. Only what the "
+                           "user named; never invent items. Empty if none.",
+        }
+    },
+    "required": ["items"],
+}
+
+
+def extract_verification_checklist(query):
+    # scope fidelity : a named sub-question the user explicitly asked for
+    # ("verify both of Dana's claims") must never be dropped silently .
+    # extracted once , ratified with the spec , coverage code-checked by
+    # the checkpoint . the llm proposes the list ; code validates shape
+    # and count (fuse semantics on the cap - an absurd list is shown to a
+    # human , not truncated into silence)
+    prompt = (
+        "List every sub-question or claim that this problem statement "
+        "EXPLICITLY asks to be verified, checked, or decided. One entry "
+        "per named item, phrased close to the user's own words.\n"
+        "- Include only items the user actually named. Do not invent, "
+        "split hairs, or pad.\n"
+        "- The overall decision itself counts as one item.\n"
+        "- An empty list is valid if the user named nothing specific.\n\n"
+        f"Problem: {query.prompt}\n"
+        f"Scope: {query.scope or 'not specified'}\n"
+    )
+    from parametres import MAX_CHECKLIST_ITEMS
+    items = json.loads(ask_llm(prompt, CHECKLIST_SCHEMA))["items"]
+    cleaned = [str(item).strip() for item in items if str(item).strip()]
+    if len(cleaned) > MAX_CHECKLIST_ITEMS:
+        raise ValueError(
+            f"[checklist] extracted {len(cleaned)} items - over the "
+            f"{MAX_CHECKLIST_ITEMS} fuse. Abnormal - halting for human review."
+        )
+    return cleaned
+
+
 def build_problem_specification(query, record):
     # this raises on contested / no-structure, so we can't build a spec
     # from an unratified decision - the door stays locked.
@@ -730,6 +750,10 @@ def build_problem_specification(query, record):
             "scope": query.scope or "not specified",
             "contextual_anchors": anchors,
             "assumptions": extracted["assumptions"],
+            # named sub-questions the user explicitly asked for . part of
+            # the ratified spec ; the checkpoint refuses stop_success
+            # while any item lacks a completed covering task
+            "verification_checklist": extract_verification_checklist(query),
         },
         # anchors are user-declared GROUND TRUTH ; assumptions are the
         # system's own guesses . the two must never be presented with the

@@ -79,6 +79,20 @@ CALIBRATION_LOG_PATH = os.path.join(PROJECT_ROOT, "calibration_log.jsonl")
 
 
 # ===========================================================================
+# intake/formalization.py
+# ===========================================================================
+
+# scope fidelity (live stress run , round 2) : a named sub-question
+# ("verify Dana's zero-documented-evidence claim") was dropped silently
+# even though the user asked for it EXPLICITLY . the fix is structural :
+# every named question or claim-to-verify is extracted into a checklist
+# at formalization , ratified with the spec , and the checkpoint refuses
+# stop_success while any item lacks a completed covering task . the cap
+# is a fuse : more extracted items than this halts for a human
+MAX_CHECKLIST_ITEMS = 10
+
+
+# ===========================================================================
 # agents/planner.py
 # ===========================================================================
 
@@ -93,6 +107,18 @@ MAX_TOTAL_TASKS = 30
 # ===========================================================================
 
 MAX_PARALLEL_WORKERS = 4          # how many tasks run at once
+
+# claim corroboration at integration (live stress run) : two tasks
+# asserting the same fact used to create two separate single-source
+# claims , so no claim could ever satisfy the 2-independent-tasks rule -
+# the independence gate was structurally unsatisfiable . a new statement
+# whose token overlap with an existing claim clears this jaccard bound
+# AND whose negation profile matches exactly is treated as corroboration :
+# the new artifact links to the EXISTING claim instead of spawning a twin .
+# the negation guard exists because "asyncio does help" vs "asyncio does
+# not help" are one token apart and must never merge
+CLAIM_MATCH_JACCARD = 0.75
+NEGATION_TOKENS = ("not", "no", "never", "cannot", "without", "zero", "none")
 MAX_RETRIES = 3                   # attempts per task before it is "failed"
 BACKOFF_BASE_SECONDS = 2          # wait 2s, 4s, 8s between attempts
 BATCH_BUDGET_SECONDS = 1200        #  20 min wall-clock fuse for a whole batch
@@ -103,6 +129,52 @@ BATCH_BUDGET_SECONDS = 1200        #  20 min wall-clock fuse for a whole batch
 # ===========================================================================
 
 MAX_VERDICTS_PER_ITERATION = 40
+
+# epistemic-integrity gates , added after a live-run audit found four
+# failure genres the gauntlet let through : fabricated approvals ,
+# single-source "supported" , synthesis outputs cited back as evidence ,
+# and numbers in claims that never appeared in the user's input .
+# gauntlet policy , not kernel law - these are quality standards
+
+# non-deductive support needs evidence from 2+ DIFFERENT tasks before a
+# claim may leave unverified (citation volume from one source is an echo ,
+# not corroboration) . deductive evidence is exempt : a derivation is
+# checked by re-tracing , not by source-counting
+MIN_SOURCE_TASKS_FOR_SUPPORTED = 2
+
+# outputs of these task kinds are TERMINAL : they may cite evidence but
+# never serve as evidence for another claim in the same run . this is the
+# no-circular-evidence rule - a synthesis feeding its own conclusion back
+# into the evidence graph is bootstrapping with extra steps
+TERMINAL_TASK_KINDS = ("produce",)
+
+# claims asserting real-world events the system cannot observe (sign-offs ,
+# approvals , meetings , verifications by named people) can never be
+# promoted from run-internal artifacts : no llm text is evidence that a
+# human approved something . matching claims stay unverified with the
+# reason recorded
+EXTERNAL_CONFIRMATION_MARKERS = (
+    "sign-off", "signed off", "sign off", "signoff",
+    "approval", "approved by", "approves",
+    "confirmed by", "verified by", "validated by",
+    "agreed to", "stakeholder", "formally accepted",
+)
+
+# a computed number in a claim is only promotable if the artifact shows
+# its working - any of these markers counts as "the formula is visible" .
+# crude v1 presence check , same spirit as SCOPE_MARKERS
+FORMULA_MARKERS = ("=", "formula", "computed as", "calculation", "derived from")
+
+# v1 has NO observation tools - no code execution , no web , no
+# measurement . a claim reporting a benchmark or measurement is therefore
+# always invented (the live stress run produced "the benchmark achieved
+# 11,850 images per hour" from a worker that cannot run code) . such
+# claims are unpromotable until tools exist ; when they do , a tool-call
+# citation becomes the exemption
+UNOBSERVED_MEASUREMENT_MARKERS = (
+    "benchmark", "benchmarked", "measured", "we observed",
+    "achieved a throughput", "was executed", "test run", "profiling showed",
+)
 
 
 # ===========================================================================
