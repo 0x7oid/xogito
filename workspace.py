@@ -20,9 +20,12 @@ task_statuses = Literal["pending", "in_progress", "completed", "failed" , "rejec
 
 @dataclass
 class Task:
+    # FIX: kind had no default but sat after a defaulted field , which is a
+    # TypeError at class-definition time ("non-default argument follows
+    # default argument") - moved kind up , it stays mandatory
     id: int
-    description: str = ""
     kind: task_kinds
+    description: str = ""
     depends_on : list[int] = field(default_factory=list) # that is a list of ids of the tasks
     status : task_statuses = "pending"
     done_when : str = "" # this is a description of the expected output of the task
@@ -116,24 +119,28 @@ class Workspace:
                 raise ValueError(f"Dependency task with id {dependency_id} does not exist.")
             # todo : call for cyclic dependency check here
 
-    def add_task(self, task: Task):
+    # FIX: the write methods hardcoded actor strings ("planner", "executor")
+    # so provenance misattributed every write made by anyone else - each
+    # writer now takes an explicit actor parameter , no default , so a
+    # caller can never be logged as someone it is not
+    def add_task(self, task: Task, actor: actor_kinds):
         self.validate_task_dependencies(task)
         task.id = self.next_task_id
         self._tasks[task.id] = task
         self.next_task_id += 1
-        self._log_provenance(actor="planner", action="add_task", target_id=task.id, target_type="task")
+        self._log_provenance(actor=actor, action="add_task", target_id=task.id, target_type="task")
 
     def validate_claim_evidence(self, claim: Claim):
         for evidence_id in claim.evidence_ids:
             if evidence_id not in self._artifacts:
                 raise ValueError(f"Evidence artifact with id {evidence_id} does not exist.")
             
-    def add_claim(self, claim: Claim):
+    def add_claim(self, claim: Claim, actor: actor_kinds):
         self.validate_claim_evidence(claim)
         claim.id = self.next_claim_id
         self._claims[claim.id] = claim
         self.next_claim_id += 1
-        self._log_provenance(actor="planner", action="add_claim", target_id=claim.id, target_type="claim")
+        self._log_provenance(actor=actor, action="add_claim", target_id=claim.id, target_type="claim")
 
     def validate_artifact_claims(self, artifact: Artifact):
         for claim_id in artifact.claim_ids:
@@ -148,12 +155,12 @@ class Workspace:
             
 
             
-    def add_artifact(self, artifact: Artifact):
+    def add_artifact(self, artifact: Artifact, actor: actor_kinds):
         self.validate_artifact_claims(artifact)
         artifact.id = self.next_artifact_id
         self._artifacts[artifact.id] = artifact
         self.next_artifact_id += 1
-        self._log_provenance(actor="executor", action="add_artifact", target_id=artifact.id, target_type="artifact")
+        self._log_provenance(actor=actor, action="add_artifact", target_id=artifact.id, target_type="artifact")
 
     def validate_provenance_entry(self, entry: ProvenanceEntry):
         if entry.target_type == "task" and entry.target_id not in self._tasks:
@@ -167,68 +174,82 @@ class Workspace:
         self.validate_provenance_entry(entry)
         self._provenance_log.append(entry)
 
-    def link_evidence(self , claim_id:int , artifact_id:int):
+    def link_evidence(self , claim_id:int , artifact_id:int , actor: actor_kinds):
         # a bidirectional link between a claim and an artifact
         # without this function we would have a referential integrity violation between a claim and the artifact
         if claim_id not in self._claims:
             raise ValueError(f"Claim with id {claim_id} does not exist.")
         if artifact_id not in self._artifacts:
             raise ValueError(f"Artifact with id {artifact_id} does not exist.")
-        
+
         self._claims[claim_id].evidence_ids.append(artifact_id)
         self._artifacts[artifact_id].claim_ids.append(claim_id)
-    def unlink_evidence(self , claim_id:int , artifact_id:int):
+        # FIX: link/unlink never logged provenance , but the adjudicator's
+        # undercut resolution promises "the link's existence and removal
+        # both live in provenance forever" - a promise the workspace now keeps
+        self._log_provenance(actor=actor, action=f"link_evidence:artifact_{artifact_id}", target_id=claim_id, target_type="claim")
+    def unlink_evidence(self , claim_id:int , artifact_id:int , actor: actor_kinds):
         # a bidirectional unlink between a claim and an artifact
         # without this function we would have a referential integrity violation between a claim and the artifact
         if claim_id not in self._claims:
             raise ValueError(f"Claim with id {claim_id} does not exist.")
         if artifact_id not in self._artifacts:
             raise ValueError(f"Artifact with id {artifact_id} does not exist.")
-        
+
         self._claims[claim_id].evidence_ids.remove(artifact_id)
         self._artifacts[artifact_id].claim_ids.remove(claim_id)
+        self._log_provenance(actor=actor, action=f"unlink_evidence:artifact_{artifact_id}", target_id=claim_id, target_type="claim")
 
     def update_belief_of_claim(self, claim_id: int, new_belief: belief_ladder , veridict : dict , actor: actor_kinds):
         # in order to update the belief we need a veridct confirmation from the kernel
         if claim_id not in self._claims:
             raise ValueError(f"Claim with id {claim_id} does not exist.")
-        
+
         old_belief = self._claims[claim_id].belief
 
         for evidence_id in veridict.get("evidence_ids", []):
             if evidence_id not in self._artifacts:
                 raise ValueError(f"Evidence artifact with id {evidence_id} does not exist.")
-    
+
         assert_legal_transition(old_belief, new_belief , veridict)
 
 
         self._claims[claim_id].belief = new_belief
-        self._log_provenance(actor="evaluator", action=f"update_belief_to_{new_belief}", target_id=claim_id, target_type="claim")
+        # FIX: two bugs in the old log line . it hardcoded actor="evaluator"
+        # (the adjudicator's rulings would have been attributed to the
+        # evaluator) and it wrote "update_belief_to_X" while the
+        # adjudicator's provenance readers parse "belief:OLD->NEW" - the
+        # pre-contest rung and the contest record were unreconstructable
+        self._log_provenance(actor=actor, action=f"belief:{old_belief}->{new_belief}", target_id=claim_id, target_type="claim")
 
 
-    def update_task_status(self, task_id: int, new_status: task_statuses):
+    def update_task_status(self, task_id: int, new_status: task_statuses, actor: actor_kinds):
         if task_id not in self._tasks:
             raise ValueError(f"Task with id {task_id} does not exist.")
         self._tasks[task_id].status = new_status
-        self._log_provenance(actor="executor", action=f"update_task_status_to_{new_status}", target_id=task_id, target_type="task")
+        self._log_provenance(actor=actor, action=f"update_task_status_to_{new_status}", target_id=task_id, target_type="task")
 
 # GETTERS ########################################################################################################################
     def get_task(self, task_id: int) -> Task:
         try:
-            return self._tasks[task_id]
+            # FIX: get_task and get_artifact handed out the live internal
+            # objects while get_claim deep-copied - the copy trap , half
+            # closed . all getters now deep-copy ; writers keep using the
+            # internal dicts directly
+            return deepcopy(self._tasks[task_id])
         except KeyError:
             raise ValueError(f"Task with id {task_id} does not exist.")
-        
+
 
     def get_claim(self, claim_id: int) -> Claim:
         try:
             return deepcopy(self._claims[claim_id]) # protection mechanism to avoid external mutation of the internal state
         except KeyError:
             raise ValueError(f"Claim with id {claim_id} does not exist.")
-        
+
     def get_artifact(self, artifact_id: int) -> Artifact:
         try:
-            return self._artifacts[artifact_id]
+            return deepcopy(self._artifacts[artifact_id])
         except KeyError:
             raise ValueError(f"Artifact with id {artifact_id} does not exist."
                              )

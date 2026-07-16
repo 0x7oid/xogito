@@ -2,3 +2,6 @@ __pycache__/
 .env
 .venv
 reasoning_framework.txt
+reports/
+llm_cache.jsonl
+calibration_log.jsonl
