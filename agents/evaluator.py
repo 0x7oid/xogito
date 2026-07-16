@@ -294,6 +294,29 @@ def _check_tempo(proposed, current_belief, claim_id, promoted_this_iteration):
     return CheckResult(True, proposed)
 
 
+def _cap_rung_skip(proposed, current_belief):
+    # FIX: run evidence (32 of 32 verdicts in a single run) showed the
+    # proposer almost always answers "verified" for a claim whose artifact
+    # states it - a self-asserted claim trivially fits "the artifact
+    # explicitly states the claim" . DROPPING those verdicts starved the
+    # ladder : nothing ever reached supported , so no dual-pass , no
+    # contradiction had anything to work on . the gauntlet's own principle
+    # is that caps beat drops ("the information survives , the overreach
+    # does not") , so a rung-skip is now capped to exactly ONE rung above
+    # the current belief . the dual-pass still gates the capped promotion
+    if proposed in BELIEF_ORDER and current_belief in BELIEF_ORDER:
+        step = BELIEF_ORDER[proposed] - BELIEF_ORDER[current_belief]
+        if step > 1:
+            next_rung = proposed
+            for label in BELIEF_ORDER:
+                if BELIEF_ORDER[label] == BELIEF_ORDER[current_belief] + 1:
+                    next_rung = label
+                    break
+            return CheckResult(True, next_rung,
+                               " [capped: one rung at a time]")
+    return CheckResult(True, proposed)
+
+
 def _check_testimonial_cap(proposed, evidence_type):
     # testimonial evidence never verifies . pointers alone
     # cannot make a claim reliable
@@ -378,6 +401,15 @@ def _run_gauntlet(raw_verdicts, context, workspace, promoted_this_iteration):
         # it is a skip , not a drop - nothing to log)
         if proposed == claim.belief:
             continue
+
+        # FIX: the rung-skip cap runs BEFORE the drop gates , so the tempo
+        # check below judges the capped (one-rung) proposal - its
+        # once-per-iteration drop still applies , and its own skip-a-rung
+        # drop remains as belt-and-braces behind this cap
+        rung_cap = _cap_rung_skip(proposed, claim.belief)
+        if rung_cap.proposed_belief != proposed:
+            raw["rationale"] += rung_cap.note
+            proposed = rung_cap.proposed_belief
 
         # the drop gates - any failure kills this one verdict
         drop_gates = [

@@ -579,12 +579,32 @@ IMPACT_LABELS = ("load_bearing", "peripheral")
 def _split_anchors(raw_anchors):
     # user anchors stay verbatim - code only splits them into a list,
     # never rewords them. Splits on newlines and semicolons and commas.
+    # FIX: comma-splitting sheared numeric anchors in half ("peak load is
+    # 12,000 msg/s" became "peak load is 12" + "000 msg/s") . a comma
+    # BETWEEN TWO DIGITS is part of a number , never a separator - it is
+    # shielded before the split and restored after , so the anchor stays
+    # verbatim
     if not raw_anchors:
         return []
 
+    shielded = ""
+    for position in range(len(raw_anchors)):
+        character = raw_anchors[position]
+        is_numeric_comma = (
+            character == ","
+            and position > 0
+            and position + 1 < len(raw_anchors)
+            and raw_anchors[position - 1].isdigit()
+            and raw_anchors[position + 1].isdigit()
+        )
+        if is_numeric_comma:
+            shielded += "\x00"
+        else:
+            shielded += character
+
     pieces = []
-    for line in raw_anchors.replace(";", "\n").replace(",", "\n").split("\n"):
-        line = line.strip()
+    for line in shielded.replace(";", "\n").replace(",", "\n").split("\n"):
+        line = line.strip().replace("\x00", ",")
         if line:
             pieces.append(line)
     return pieces
