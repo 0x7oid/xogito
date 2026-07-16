@@ -45,6 +45,7 @@ from parametres import (
     TERMINAL_TASK_KINDS,
     EXTERNAL_CONFIRMATION_MARKERS,
     FORMULA_MARKERS,
+    UNOBSERVED_MEASUREMENT_MARKERS,
 )
 
 
@@ -432,6 +433,15 @@ def _check_external_confirmation(proposed, current_belief, statement):
                                    f"asserts an external confirmation ({marker!r}) - "
                                    "unpromotable without out-of-run evidence ; "
                                    "correct status is pending , not believed")
+        # v1 has no observation tools , so a claim reporting a benchmark
+        # or measurement is always invented . unpromotable until tools
+        # exist (a tool-call citation becomes the exemption then)
+        for marker in UNOBSERVED_MEASUREMENT_MARKERS:
+            if marker in lowered:
+                return CheckResult(False, proposed,
+                                   f"reports a measurement ({marker!r}) this run "
+                                   "cannot have performed - no observation tools "
+                                   "exist ; the number is invented")
     return CheckResult(True, proposed)
 
 

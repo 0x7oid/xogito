@@ -93,6 +93,18 @@ MAX_TOTAL_TASKS = 30
 # ===========================================================================
 
 MAX_PARALLEL_WORKERS = 4          # how many tasks run at once
+
+# claim corroboration at integration (live stress run) : two tasks
+# asserting the same fact used to create two separate single-source
+# claims , so no claim could ever satisfy the 2-independent-tasks rule -
+# the independence gate was structurally unsatisfiable . a new statement
+# whose token overlap with an existing claim clears this jaccard bound
+# AND whose negation profile matches exactly is treated as corroboration :
+# the new artifact links to the EXISTING claim instead of spawning a twin .
+# the negation guard exists because "asyncio does help" vs "asyncio does
+# not help" are one token apart and must never merge
+CLAIM_MATCH_JACCARD = 0.75
+NEGATION_TOKENS = ("not", "no", "never", "cannot", "without", "zero", "none")
 MAX_RETRIES = 3                   # attempts per task before it is "failed"
 BACKOFF_BASE_SECONDS = 2          # wait 2s, 4s, 8s between attempts
 BATCH_BUDGET_SECONDS = 1200        #  20 min wall-clock fuse for a whole batch
@@ -138,6 +150,17 @@ EXTERNAL_CONFIRMATION_MARKERS = (
 # its working - any of these markers counts as "the formula is visible" .
 # crude v1 presence check , same spirit as SCOPE_MARKERS
 FORMULA_MARKERS = ("=", "formula", "computed as", "calculation", "derived from")
+
+# v1 has NO observation tools - no code execution , no web , no
+# measurement . a claim reporting a benchmark or measurement is therefore
+# always invented (the live stress run produced "the benchmark achieved
+# 11,850 images per hour" from a worker that cannot run code) . such
+# claims are unpromotable until tools exist ; when they do , a tool-call
+# citation becomes the exemption
+UNOBSERVED_MEASUREMENT_MARKERS = (
+    "benchmark", "benchmarked", "measured", "we observed",
+    "achieved a throughput", "was executed", "test run", "profiling showed",
+)
 
 
 # ===========================================================================

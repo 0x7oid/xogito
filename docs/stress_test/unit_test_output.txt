@@ -1,0 +1,26 @@
+25/25 tests passed:
+  [PASS] pinning: user numbers extracted from any spec shape
+  [PASS] pinning: invented number without a formula is dropped
+  [PASS] pinning: user's own number promotes ; formula-backed number promotes
+  [PASS] pinning: demotions are never blocked (doubt is free)
+  [PASS] fabrication: sign-off claims cannot be promoted
+  [PASS] fabrication: measurement claims cannot be promoted (no tools exist)
+  [PASS] fabrication: ordinary factual claims still promote
+  [PASS] independence: one task echoed twice cannot make supported
+  [PASS] independence: two distinct tasks make supported
+  [PASS] independence: deductive single-source is exempt , negative never is
+  [PASS] circularity: a produce-kind artifact cannot serve as evidence
+  [PASS] corroboration: near-duplicate statements corroborate the original
+  [PASS] corroboration: a negation flip NEVER merges
+  [PASS] corroboration: unrelated statements do not merge
+  [PASS] ladder: testimonial evidence caps at supported
+  [PASS] ladder: tempo forbids a second promotion in one iteration
+  [PASS] checkpoint: all proposals rejected as duplicates = frontier exhausted
+  [PASS] checkpoint: a vague rejection keeps it a stall
+  [PASS] catalog: every structure is reachable by some characteristics combo
+  [PASS] catalog: every primary_output surfaces at least one candidate
+  [PASS] catalog: ids unique , every entry carries the required fields
+  [PASS] kernel: unratified spec is refused at every door
+  [PASS] client: server-stated 429 retry delay is honored
+  [PASS] client: vote splits reduce to label tiers , never ratios
+  [PASS] numbers: percent tokens pin both forms

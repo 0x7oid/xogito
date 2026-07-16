@@ -208,6 +208,12 @@ def _propose_tasks(context):
         "- To check a claim of the form 'no X exists / zero incidents', "
         "propose searches worded to FIND counter-evidence (different phrasings, "
         "different angles) - never a single search that mirrors the claim.\n"
+        "- Workers can only recall documented knowledge and derive "
+        "conclusions. They cannot run code, execute benchmarks, measure "
+        "systems, browse the web, or contact people. Never propose a task "
+        "requiring those - propose the knowledge-based version instead "
+        "(e.g. 'find documented benchmark results for X' rather than "
+        "'benchmark X').\n"
     )
     result = json.loads(ask_llm(prompt, PROPOSE_SCHEMA))
     return result["tasks"], result["frontier_empty_reason"]
@@ -384,7 +390,11 @@ def _insert_tasks(proposals, judgments, workspace):
         rejected = (judgment["label"] != "sound") or depends_on_rejected
 
         if judgment["label"] != "sound":
-            reason = judgment["reason"]
+            # the label travels WITH the reason : the checkpoint reads it to
+            # tell "all duplicates = frontier exhausted" apart from a real
+            # stall , and the planner's next-iteration context gets the
+            # category for free
+            reason = f"{judgment['label']}: {judgment['reason']}"
         elif depends_on_rejected:
             reason = "depends on a rejected task"
         else:
