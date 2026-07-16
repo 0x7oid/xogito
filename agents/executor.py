@@ -36,6 +36,7 @@ REQUIRED WORKSPACE EDIT (the tripwire, do it once):
 """
 
 import json
+import re
 import time
 from typing import Literal
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
@@ -55,6 +56,8 @@ from parametres import (
     MAX_RETRIES,
     BACKOFF_BASE_SECONDS,
     BATCH_BUDGET_SECONDS,
+    CLAIM_MATCH_JACCARD,
+    NEGATION_TOKENS,
 )
 
 
@@ -190,6 +193,15 @@ def _build_worker_prompt(context):
         "- If your task is an investigation, state WHERE and HOW you searched, "
         "and report any evidence AGAINST the main finding if you "
         "encountered it. Do not invent counter-evidence.\n"
+        "- CAPABILITY LIMITS: you cannot run code, execute benchmarks, "
+        "measure anything, access the web, or contact anyone. Your only "
+        "capabilities are recalling documented knowledge and deriving "
+        "conclusions step by step. If the task requires an action you "
+        "cannot perform (a benchmark, a measurement, an approval), say so "
+        "plainly in the content, name the missing capability in "
+        "proposed_tasks, and assert NO claims about results you did not "
+        "actually obtain. Reporting 'this cannot be done from here' is a "
+        "correct and complete answer.\n"
     )
 
 
@@ -338,8 +350,53 @@ def _result_task_id(result):
 # task execution is parallel, but integration is serial. the workspace is not thread-safe, so we must integrate results one by one in the main thread.
 # ===========================================================================
 
+# ---------------------------------------------------------------------------
+# claim corroboration (live stress run) : two tasks asserting the same
+# fact used to spawn two single-source twins , so the evaluator's
+# 2-independent-tasks rule could never be met and nothing got established .
+# a near-identical statement is now treated as CORROBORATION of the
+# existing claim - the new artifact links to it as additional evidence .
+# matching is conservative : token jaccard above a code-owned bound AND an
+# identical negation profile ("does help" / "does not help" are one token
+# apart and must never merge)
+# ---------------------------------------------------------------------------
+
+_CLAIM_TOKEN_PATTERN = re.compile(r"[a-z0-9.]+")
+
+
+def _claim_profile(statement):
+    tokens = set(_CLAIM_TOKEN_PATTERN.findall(statement.lower()))
+    negations = tuple(sorted(t for t in tokens if t in NEGATION_TOKENS))
+    return tokens, negations
+
+
+def _find_corroborated_claim(statement, known_profiles):
+    # known_profiles : claim_id -> (token_set , negation_profile) .
+    # returns the id of the matching existing claim , or None
+    tokens, negations = _claim_profile(statement)
+    if not tokens:
+        return None
+    for claim_id in known_profiles:
+        known_tokens, known_negations = known_profiles[claim_id]
+        if negations != known_negations:
+            continue
+        union = tokens | known_tokens
+        overlap = tokens & known_tokens
+        if union and len(overlap) / len(union) >= CLAIM_MATCH_JACCARD:
+            return claim_id
+    return None
+
+
 def integrate_results(results, workspace):
     integrated_artifact_ids = []
+
+    # profiles of every claim already in the workspace , extended as this
+    # batch adds new ones - so corroboration works within a batch too
+    known_profiles = {}
+    evidence_by_claim = {}
+    for existing in workspace.snapshot()["claims"]:
+        known_profiles[existing.id] = _claim_profile(existing.statement)
+        evidence_by_claim[existing.id] = set(existing.evidence_ids)
 
     for result in results:
 
@@ -358,8 +415,25 @@ def integrate_results(results, workspace):
         workspace.add_artifact(artifact, actor="executor")
 
         # 2. each asserted claim enters UNVERIFIED and gets linked to the
-        #    artifact that asserted it
+        #    artifact that asserted it - unless it corroborates an existing
+        #    claim , in which case the artifact becomes ADDITIONAL evidence
+        #    for that claim instead of spawning a single-source twin
         for statement in result.claim_statements:
+            matched_id = _find_corroborated_claim(statement, known_profiles)
+
+            if matched_id is not None:
+                if artifact.id in evidence_by_claim[matched_id]:
+                    continue   # same artifact asserting the same fact twice
+                try:
+                    workspace.link_evidence(matched_id, artifact.id, actor="executor")
+                    evidence_by_claim[matched_id].add(artifact.id)
+                    print(f"[executor] claim corroborated: artifact {artifact.id} "
+                          f"joins claim {matched_id} as additional evidence")
+                except ValueError as error:
+                    print(f"[executor] corroboration link failed on claim "
+                          f"{matched_id}: {error}")
+                continue
+
             claim = Claim(
                 id=0,                  # workspace assigns the real id
                 statement=statement,
@@ -367,6 +441,8 @@ def integrate_results(results, workspace):
             )
             workspace.add_claim(claim, actor="executor")
             workspace.link_evidence(claim.id, artifact.id, actor="executor")
+            known_profiles[claim.id] = _claim_profile(statement)
+            evidence_by_claim[claim.id] = {artifact.id}
 
         # 3. proposed tasks are NOT inserted - the planner is the single
         #    door for the task graph. surfaced here for the record; the
