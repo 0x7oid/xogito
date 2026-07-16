@@ -45,6 +45,36 @@ from parametres import (
 # request will not get better by asking again
 RETRYABLE_STATUS_CODES = (429, 500, 502, 503, 504)
 
+
+def _server_retry_delay_seconds(error):
+    # a 429 usually carries the server's OWN retry delay (RetryInfo /
+    # retryDelay , e.g. "37s") . when the api states a wait , that wait is
+    # authoritative - guessing shorter re-triggers the limiter , guessing
+    # longer wastes the run . returns None when the error carries no delay
+    def walk(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key.lower() in ("retrydelay", "retry_delay") and isinstance(value, str):
+                    stripped = value.strip().rstrip("s")
+                    try:
+                        return float(stripped)
+                    except ValueError:
+                        return None
+                found = walk(value)
+                if found is not None:
+                    return found
+        elif isinstance(node, (list, tuple)):
+            for value in node:
+                found = walk(value)
+                if found is not None:
+                    return found
+        return None
+
+    details = getattr(error, "details", None)
+    if details is None:
+        return None
+    return walk(details)
+
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
 
@@ -151,10 +181,16 @@ def ask_llm(prompt, schema, model=DEFAULT_MODEL, temperature=0):
             print(f"[client] transient {error.code} from the api "
                   f"(attempt {attempt}/{TRANSPORT_RETRIES}) - backing off")
             if attempt < TRANSPORT_RETRIES:
-                # exponential backoff , capped : 3s, 9s, 27s, 60s, 60s
+                # exponential backoff , capped : 3s, 9s, 27s, 60s, 60s -
+                # UNLESS the api stated its own retry delay (429s do) , in
+                # which case the server's number wins : it knows its own
+                # rate window , our guess does not
                 wait_seconds = TRANSPORT_BACKOFF_BASE_SECONDS ** attempt
                 if wait_seconds > TRANSPORT_MAX_BACKOFF_SECONDS:
                     wait_seconds = TRANSPORT_MAX_BACKOFF_SECONDS
+                server_delay = _server_retry_delay_seconds(error)
+                if server_delay is not None:
+                    wait_seconds = server_delay + 1  # +1s of margin past the window
                 time.sleep(wait_seconds)
 
     raise last_error

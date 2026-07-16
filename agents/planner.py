@@ -198,7 +198,16 @@ def _propose_tasks(context):
         "an empty task list and explain why in frontier_empty_reason.\n"
         "- Write done_when outcome-neutrally: 'the presence or absence of X is established'"
         " - never presupposing the answer.\n"
-
+        "- If the problem statement names a disagreement between people, a "
+        "specific claim someone made, or an explicit sub-question, propose a "
+        "task that checks each one directly. User-named disputes are work "
+        "items, not background.\n"
+        "- When candidates are being compared, apply the same investigation "
+        "to every candidate: a task like 'find known reliability issues of X' "
+        "must exist once per candidate, never only for one of them.\n"
+        "- To check a claim of the form 'no X exists / zero incidents', "
+        "propose searches worded to FIND counter-evidence (different phrasings, "
+        "different angles) - never a single search that mirrors the claim.\n"
     )
     result = json.loads(ask_llm(prompt, PROPOSE_SCHEMA))
     return result["tasks"], result["frontier_empty_reason"]
