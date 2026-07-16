@@ -5,11 +5,6 @@
 <p align="center">
   <img src="LOGO.png" height="550">
 </p>
-Here is the updated README, with a new section added right after the introduction to clearly define the kinds of complex problems and decision-making scenarios Xogito is built to handle.
-
----
-
-# Xogito
 
 **A second brain for large language models.**
 
