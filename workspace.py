@@ -31,6 +31,10 @@ class Task:
     done_when : str = "" # this is a description of the expected output of the task
     why_now : str = "" # this is a description of the urgency of the task
     rejection_reason : str = "" # this is a description of the reason for rejection of the task
+    # which verification-checklist item (index into the spec's checklist)
+    # this task covers ; -1 = none . set by the planner , read by the
+    # checkpoint's coverage query - scope fidelity is code-checked
+    covers_checklist_item : int = -1
 
 
 belief_ladder = Literal["unverified",

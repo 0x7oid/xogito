@@ -3,49 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Xogito — Design</title>
+<title>Xogito: Design</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=IBM+Plex+Sans:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #faf8f2;
-    --panel: #f2efe6;
-    --border: #e0dccd;
-    --border-strong: #c5c0ad;
-    --ink: #22211b;
-    --text: #3b392f;
-    --muted: #716c5b;
-    --accent: #2f5d43;        /* deep forest green */
-    --accent-tint: #e8efe8;
-    --sans: "DM Sans", -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-    --heading: "IBM Plex Sans", "Source Sans 3", "DM Sans", "Segoe UI", sans-serif;
+    --bg: #ffffff;
+    --panel: #f5f5f4;
+    --border: #e3e3df;
+    --border-strong: #111111;
+    --ink: #111111;
+    --text: #333331;
+    --muted: #757572;
+    --accent: #9e0012;         /* swiss red */
+    --accent-tint: #fdecec;
+    --sans: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --heading: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
     --mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, Consolas, monospace;
-    --toc-w: 258px;
-  }
-  :root[data-theme="dark"] {
-    --bg: #1d1c17;
-    --panel: #26241d;
-    --border: #38352a;
-    --border-strong: #56523f;
-    --ink: #ece9dd;
-    --text: #c8c4b4;
-    --muted: #8f8a75;
-    --accent: #7fae8e;
-    --accent-tint: #232b23;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #1d1c17;
-      --panel: #26241d;
-      --border: #38352a;
-      --border-strong: #56523f;
-      --ink: #ece9dd;
-      --text: #c8c4b4;
-      --muted: #8f8a75;
-      --accent: #7fae8e;
-      --accent-tint: #232b23;
-    }
+    --toc-w: 260px;
   }
 
   * { box-sizing: border-box; }
@@ -54,12 +30,24 @@
     margin: 0;
     font-family: var(--sans);
     font-size: 16px;
-    line-height: 1.65;
+    line-height: 1.6;
     color: var(--text);
     background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent); color: #fff; }
+
+  #progressBar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 3px;
+    width: 0;
+    background: var(--accent);
+    z-index: 20;
+    transition: width .35s ease;
   }
 
-  .layout { display: flex; max-width: 1220px; margin: 0 auto; }
+  .layout { display: flex; max-width: 1280px; margin: 0 auto; }
 
   nav.toc {
     width: var(--toc-w);
@@ -68,83 +56,175 @@
     top: 0;
     height: 100vh;
     overflow-y: auto;
-    padding: 2rem 1.3rem 3rem 1.5rem;
-    border-right: 1px solid var(--border);
-    font-size: .8rem;
+    padding: 2.4rem 1.5rem 3rem 2rem;
+    border-right: 2px solid var(--ink);
+    font-size: .82rem;
     line-height: 1.45;
   }
   nav.toc .brand {
     font-family: var(--heading);
-    font-weight: 700;
-    font-size: 1rem;
+    font-weight: 800;
+    font-size: 1.45rem;
+    letter-spacing: -.03em;
     color: var(--ink);
   }
+  nav.toc .brand::after { content: "."; color: var(--accent); }
   nav.toc .brand-sub {
     color: var(--muted);
-    margin-bottom: 1.5rem;
-    font-size: .74rem;
+    margin-bottom: 2rem;
+    font-size: .7rem;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
   }
   nav.toc .part {
+    display: flex;
+    align-items: center;
     font-family: var(--heading);
     font-size: .66rem;
-    font-weight: 600;
-    letter-spacing: .11em;
+    font-weight: 700;
+    letter-spacing: .14em;
     text-transform: uppercase;
-    color: var(--accent);
-    margin: 1.3rem 0 .35rem;
+    color: var(--ink);
+    margin: 1.5rem 0 .4rem;
+  }
+  nav.toc .part::before {
+    content: "";
+    width: .62em;
+    height: .62em;
+    background: var(--accent);
+    margin-right: .55em;
+    flex-shrink: 0;
   }
   nav.toc a {
     display: block;
     color: var(--text);
     text-decoration: none;
-    padding: .18rem .5rem;
-    margin-left: -.5rem;
-    border-radius: 3px;
+    padding: .2rem .6rem;
+    margin-left: -.6rem;
+    border-left: 3px solid transparent;
+    cursor: pointer;
   }
   nav.toc a:hover, nav.toc a:focus-visible {
-    background: var(--accent-tint);
     color: var(--accent);
+  }
+  nav.toc a.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    font-weight: 700;
   }
   nav.toc a .num {
     display: inline-block;
-    width: 1.6em;
+    width: 1.7em;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
+  nav.toc a.active .num { color: var(--accent); }
 
   main {
     flex: 1;
     min-width: 0;
-    max-width: 74ch;
-    padding: 2.8rem 3.2rem 5rem;
+    max-width: 72ch;
+    padding: 3.4rem 4rem 6rem;
+  }
+
+  /* ---------- paged chapters ---------- */
+  .page { display: none; }
+  .page.active { display: block; }
+  .page.active.anim-fwd { animation: pageFwd .38s ease both; }
+  .page.active.anim-back { animation: pageBack .38s ease both; }
+  @keyframes pageFwd {
+    from { opacity: 0; transform: translateX(28px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes pageBack {
+    from { opacity: 0; transform: translateX(-28px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .page.active.anim-fwd, .page.active.anim-back { animation: none; }
+    #progressBar { transition: none; }
+  }
+  .page > h2:first-child { margin-top: 0; }
+  .page > .part-head:first-child { margin-top: 0; }
+  .page > header.doc-header:first-child { margin-top: 0; }
+
+  .pager {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 4rem;
+    padding-top: 1.6rem;
+    border-top: 1px solid var(--ink);
+  }
+  .pager-btn {
+    font-family: var(--sans);
+    font-size: .84rem;
+    font-weight: 500;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    padding: .6rem 1rem;
+    cursor: pointer;
+    flex: 1 1 0;
+    max-width: 44%;
+    text-align: left;
+    line-height: 1.4;
+    transition: background .12s, color .12s;
+  }
+  .pager-btn.next { text-align: right; }
+  .pager-btn:hover:not(:disabled) {
+    background: var(--ink);
+    color: #fff;
+  }
+  .pager-btn:disabled { visibility: hidden; }
+  .pager-btn .dir {
+    display: block;
+    font-family: var(--heading);
+    font-size: .64rem;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: .2rem;
+  }
+  .pager-btn:hover:not(:disabled) .dir { color: #ff8a95; }
+  .pager-ind {
+    align-self: center;
+    font-family: var(--mono);
+    font-size: .74rem;
+    color: var(--muted);
+    white-space: nowrap;
   }
 
   header.doc-header {
-    margin-bottom: 3rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 2px solid var(--ink);
+    margin-bottom: 2.8rem;
+    padding: 2rem 0 0;
+    border-top: 8px solid var(--ink);
   }
   header.doc-header .kicker {
     font-family: var(--heading);
-    font-size: .7rem;
-    font-weight: 600;
-    letter-spacing: .13em;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .16em;
     text-transform: uppercase;
     color: var(--accent);
-    margin-bottom: .55rem;
+    margin-bottom: .8rem;
   }
   header.doc-header h1 {
     font-family: var(--heading);
-    font-size: 1.95rem;
-    font-weight: 700;
-    letter-spacing: -.02em;
-    line-height: 1.18;
+    font-size: 2.7rem;
+    font-weight: 800;
+    letter-spacing: -.032em;
+    line-height: 1.06;
     color: var(--ink);
-    margin: 0 0 .5rem;
+    margin: 0 0 .8rem;
   }
   header.doc-header .subtitle {
     color: var(--muted);
-    font-size: .98rem;
+    font-size: 1rem;
     margin: 0;
   }
 
@@ -152,11 +232,11 @@
     display: flex;
     align-items: center;
     gap: .8rem;
-    margin: 4.4rem 0 -1.2rem;
+    margin: 0 0 1.6rem;
     font-family: var(--heading);
     font-size: .7rem;
-    font-weight: 600;
-    letter-spacing: .13em;
+    font-weight: 700;
+    letter-spacing: .16em;
     text-transform: uppercase;
     color: var(--accent);
   }
@@ -164,34 +244,49 @@
     content: "";
     flex: 1;
     height: 1px;
-    background: var(--border-strong);
+    background: var(--ink);
   }
 
   h2 {
     font-family: var(--heading);
-    font-size: 1.38rem;
-    font-weight: 700;
-    letter-spacing: -.012em;
-    line-height: 1.25;
+    font-size: 1.62rem;
+    font-weight: 800;
+    letter-spacing: -.028em;
+    line-height: 1.16;
     color: var(--ink);
-    margin: 3.2rem 0 1rem;
+    margin: 0 0 1.3rem;
+    padding-top: 1.15rem;
+    border-top: 5px solid var(--ink);
   }
   h2 .num {
     color: var(--accent);
-    margin-right: .55em;
+    margin-right: .5em;
     font-variant-numeric: tabular-nums;
   }
   h3 {
+    display: flex;
+    align-items: center;
     font-family: var(--heading);
-    font-size: .98rem;
-    font-weight: 600;
+    font-size: .78rem;
+    font-weight: 700;
+    letter-spacing: .13em;
+    text-transform: uppercase;
     color: var(--ink);
-    margin: 2rem 0 .55rem;
+    margin: 2.1rem 0 .7rem;
   }
-  p { margin: 0 0 1rem; }
-  strong { color: var(--ink); font-weight: 600; }
+  h3::before {
+    content: "";
+    width: .55em;
+    height: .55em;
+    background: var(--accent);
+    margin-right: .6em;
+    flex-shrink: 0;
+  }
+  p { margin: 0 0 .95rem; }
+  strong { color: var(--ink); font-weight: 700; }
 
   a { color: var(--accent); font-weight: 500; text-decoration-thickness: 1px; text-underline-offset: 2.5px; }
+  a:hover { color: var(--ink); }
   a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   code {
@@ -199,13 +294,13 @@
     font-size: .8em;
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: .08em .32em;
+    border-radius: 0;
+    padding: .08em .34em;
     color: var(--ink);
   }
   pre {
     background: var(--panel);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ink);
     padding: .9rem 1.1rem;
     overflow-x: auto;
     font-size: .78rem;
@@ -214,23 +309,23 @@
   pre code { background: none; border: none; padding: 0; }
 
   figure.diagram {
-    margin: 2rem 0 2.2rem;
-    padding: 1.4rem 1rem .8rem;
-    background: var(--panel);
-    border: 1px solid var(--border);
+    margin: 1.9rem 0 2.1rem;
+    padding: 1.5rem 1rem .9rem;
+    background: #fff;
+    border: 1px solid var(--ink);
     overflow-x: auto;
   }
   figure.diagram figcaption {
     font-size: .8rem;
     color: var(--muted);
-    margin-top: 1rem;
-    padding-top: .7rem;
+    margin-top: 1.1rem;
+    padding-top: .75rem;
     border-top: 1px solid var(--border);
     line-height: 1.5;
   }
   figure.diagram figcaption .fig-num {
     font-family: var(--heading);
-    font-weight: 600;
+    font-weight: 700;
     color: var(--accent);
     margin-right: .45em;
   }
@@ -246,52 +341,39 @@
   table {
     border-collapse: collapse;
     width: 100%;
-    margin: 1.4rem 0;
+    margin: 1.5rem 0;
     font-size: .86rem;
     line-height: 1.5;
   }
   th {
     font-family: var(--heading);
-    font-size: .69rem;
-    font-weight: 600;
-    letter-spacing: .07em;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .1em;
     text-transform: uppercase;
-    color: var(--ink);
-    background: var(--panel);
+    color: #fff;
+    background: var(--ink);
     text-align: left;
-    padding: .5rem .75rem;
-    border: 1px solid var(--border);
+    padding: .6rem .75rem;
+    border: none;
   }
   td {
-    padding: .55rem .75rem;
-    border: 1px solid var(--border);
+    padding: .6rem .75rem;
+    border: none;
+    border-bottom: 1px solid var(--border);
     vertical-align: top;
   }
+  tr:last-child td { border-bottom: 1px solid var(--ink); }
   td small { color: var(--muted); }
 
-  ul, ol { padding-left: 1.4rem; margin: 0 0 1rem; }
+  ul { list-style-type: square; }
+  ul, ol { padding-left: 1.4rem; margin: 0 0 .95rem; }
   li { margin-bottom: .35rem; }
   li::marker { color: var(--accent); }
 
-  dl { margin: 0 0 1rem; }
-  dt { font-weight: 600; color: var(--ink); margin-top: .8rem; }
+  dl { margin: 0 0 .95rem; }
+  dt { font-weight: 700; color: var(--ink); margin-top: .8rem; }
   dd { margin: .15rem 0 0 0; }
-
-  .theme-toggle {
-    position: fixed;
-    top: .8rem;
-    right: .9rem;
-    z-index: 10;
-    border: 1px solid var(--border);
-    background: var(--panel);
-    color: var(--text);
-    font-family: var(--sans);
-    font-size: .73rem;
-    padding: .28rem .65rem;
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
 
   @media (max-width: 900px) {
     .layout { flex-direction: column; }
@@ -300,24 +382,28 @@
       width: 100%;
       height: auto;
       border-right: none;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 1.4rem;
+      border-bottom: 2px solid var(--ink);
+      padding: 1.6rem 1.25rem;
     }
-    main { padding: 1.6rem 1.25rem 4rem; }
+    main { padding: 1.8rem 1.25rem 4rem; }
+    header.doc-header h1 { font-size: 2rem; }
+    .pager { flex-wrap: wrap; }
+    .pager-btn { max-width: none; }
+    .pager-ind { order: -1; width: 100%; text-align: center; margin-bottom: .4rem; }
   }
 
   @media print {
-    nav.toc, .theme-toggle { display: none; }
+    nav.toc, .pager, #progressBar { display: none; }
+    .page { display: block !important; break-before: page; }
     .layout, main { max-width: none; padding: 0; }
     body { font-size: 10.5pt; background: #fff; color: #000; }
-    h2 { break-before: page; }
     figure.diagram, table { break-inside: avoid; }
     a { color: inherit; text-decoration: none; }
   }
 </style>
 </head>
 <body>
-<button class="theme-toggle" id="themeToggle" aria-label="Toggle color theme">Theme</button>
+<div id="progressBar" aria-hidden="true"></div>
 <div class="layout">
 
 <nav class="toc" aria-label="Table of contents">
@@ -342,11 +428,12 @@
 
   <div class="part">III · The whole</div>
   <a href="#ch13"><span class="num">13</span>Complete architecture</a>
-  <a href="#ch14"><span class="num">14</span>Cross-cutting principles</a>
 </nav>
 
-<main>
+<main id="pages">
 
+<!-- ================= Page 1 ================= -->
+<section class="page" id="ch1">
 <header class="doc-header">
   <div class="kicker">Design documentation</div>
   <h1>Xogito: The Architecture of Auditable Reasoning</h1>
@@ -355,36 +442,37 @@
 
 <div class="part-head" role="presentation">Part I · The problem</div>
 
-<h2 id="ch1"><span class="num">1</span>Reasoning Fails Through Bookkeeping</h2>
+<h2><span class="num">1</span>Reasoning Fails Through Bookkeeping</h2>
 
-<p>Ask a frontier model a hard question and it will often produce a chain of reasoning in which every individual step is competent: correct arithmetic, plausible facts, locally valid logic. The conclusion is still wrong, often confidently wrong, and nothing in the output indicates which premises deserve trust.</p>
+<p>Ask a top AI model a hard question, and it will often reason well at every step: the math is right, the facts sound true, each piece of logic holds up on its own. But the final answer can still be wrong — stated with full confidence — and nothing in the output tells you which starting assumptions you should actually trust.</p>
 
-<p>Inspected across many failures, the pattern is consistent. The model does not fail at individual steps; it loses track of its own epistemic state. It treats a guess made early as an established fact later. It resolves contradictions between its own statements by silently dropping one. It cites its own speculation as support for further speculation. At the end, it cannot report which conclusions rest on evidence and which on momentum.</p>
+<p>The failure follows a clear pattern: the model loses track of what it truly knows versus what it's just guessing. An early guess gets treated as fact later on. When two claims disagree, one just quietly disappears. A guess gets used to back up another guess. These are record-keeping failures, not thinking failures. Xogito is built on one idea: move that record-keeping outside the model, make it explicit, and enforce it with code. Do that, and a normal LLM is already good enough to reason well.</p>
 
-<p>These are bookkeeping failures: failures of the machinery that should track what is believed, on what basis, with what confidence, and what conflicts with what. Xogito is built on one premise: if that bookkeeping is made external, explicit, and mechanically enforced, ordinary LLM capability is sufficient for reliable reasoning.</p>
+<p>The result is a set of conclusions you can check. Every claim carries a confidence label it had to earn step by step, backed by evidence you can trace, from a process that's fully logged. The real question isn't "how do we make the model smarter?" It's "what design makes the record-keeping impossible to break quietly?"</p>
+</section>
 
-<p>The system's output is a set of auditable conclusions. Every claim in the final report carries a confidence label earned through gated transitions, backed by evidence that can be traced, produced by a process whose every state change was recorded. The design question throughout is therefore "what architecture makes it impossible for the bookkeeping to silently fail?", not "how do we make the model smarter?"</p>
+<!-- ================= Page 2 ================= -->
+<section class="page" id="ch2">
+<h2><span class="num">2</span>The First Commitment: LLM Proposes, Code Disposes</h2>
 
-<h2 id="ch2"><span class="num">2</span>The First Commitment: LLM Proposes, Code Disposes</h2>
+<p>Should the model's output be allowed to change the system's state directly? Most agent frameworks say yes, then add checks afterward. Here, a bad write means a corrupted belief — and a corrupted belief means the product has failed. And when agents pass loose text to each other through shared memory, mistakes get copied so many times you can no longer tell where they started.</p>
 
-<p>Should model output be allowed to mutate system state directly? Most agent frameworks answer yes, with validation added where problems appear. That approach works when the cost of a bad write is low. Here a bad write is a corrupted belief, and corrupted beliefs are the product failing. Agents passing prose to each other while updating shared memory make the failure worse: errors launder through repetition, and after a few hops the origin of a false belief is unrecoverable.</p>
+<p>Xogito uses one rule from secure system design everywhere: whoever proposes an action never gets to approve it. Model output is always a proposal, and every proposal must pass a fixed code check before it can touch the system's state. The model does all the judging and has no power to act; the code has all the power to act and does no judging.</p>
 
-<p>Xogito applies, at every boundary, the separation used in secure systems: the entity that proposes an action never authorizes it. Model outputs are always structured proposals (candidate tasks, candidate verdicts, candidate formalizations), and every proposal passes deterministic Python validation before it can touch state. The model holds all of the judgment and none of the authority; the code holds all of the authority and exercises no judgment.</p>
-
-<p>Three corollaries recur throughout the design:</p>
+<p>Three rules follow from this:</p>
 
 <dl>
-  <dt>Make illegal states unrepresentable.</dt>
-  <dd>Where possible, do not check that a rule is followed; construct the system so the violation cannot be expressed. A dependency cycle that cannot be written beats a cycle detector. Structure has no failure rate. Vigilance does.</dd>
+  <dt>Make bad states impossible to write.</dt>
+  <dd>Where possible, don't just check that a rule was followed — build the system so breaking it can't even be expressed. A dependency loop that can't be written beats a checker that looks for loops.</dd>
 
-  <dt>Labels, never numbers.</dt>
-  <dd>Model judgments are expressed in small closed vocabularies (<em>fits / partially fits / doesn't fit</em>; <em>strong / adequate / weak</em>), never scores. Numeric confidence composes well on paper, but a model-produced "7/10" drifts under rewording, fails to reproduce across runs, and invites downstream arithmetic (averaging, weighting, thresholding) that the underlying judgment never licensed.</dd>
+  <dt>Use labels, never numbers.</dt>
+  <dd>Model judgments use small, fixed sets of words (<em>fits / partially fits / doesn't fit</em>; <em>strong / adequate / weak</em>), never scores. A model-made "7/10" changes if you reword the question, doesn't repeat reliably, and invites math on a judgment that was never that precise.</dd>
 
-  <dt>Constants belong to code.</dt>
-  <dd>Every cap, threshold, and budget lives in Python constants (<code>parametres.py</code>) and never appears in a prompt. A model told "at most ten tasks" treats ten as a target and pads to meet it. A model bounded by an invisible fuse proposes what the problem needs. Graders' rubrics are never shown to generators; this is the standing defense against Goodhart's law.</dd>
+  <dt>Limits live in code.</dt>
+  <dd>Every cap, threshold, and budget sits in code (<code>parametres.py</code>) and never appears in a prompt. Tell a model "at most ten tasks" and it pads the list to ten; give it an invisible limit instead, and it proposes only what the problem actually needs. Graders never see the generators' scoring rules either — the standing defense against a system gaming its own metrics.</dd>
 </dl>
 
-<p>The pipeline these commitments produce: a vague question becomes a ratified specification (§3); a plan, execute, evaluate cycle accumulates evidence-backed claims (§6 through §10); the run ends in a report that exposes its own reasoning (§12).</p>
+<p>These rules shape the whole pipeline: a vague question first becomes an approved, clear specification (§3); rounds of planning, doing, and checking then build up claims backed by evidence (§6 through §10); and the run ends with a report that shows its own reasoning (§12).</p>
 
 <figure class="diagram">
 <pre class="mermaid">
@@ -400,48 +488,58 @@ flowchart LR
 </pre>
 <figcaption><span class="fig-num">Figure 1.</span>The high-level workflow.</figcaption>
 </figure>
+</section>
 
+<!-- ================= Page 3 ================= -->
+<section class="page" id="ch3">
 <div class="part-head" role="presentation">Part II · The machine</div>
 
-<h2 id="ch3"><span class="num">3</span>From Words to Problem: Intake and Formalization</h2>
+<h2><span class="num">3</span>From Words to Problem: Intake and Formalization</h2>
 
 <h3>Formalization is underdetermined</h3>
 
-<p>A request like "help me decide whether to launch this product in Algeria" must become a goal, constraints, and success criteria before any planning can occur. The direct implementation is one LLM call: "restate this as a formal problem." For well-posed inputs that is adequate. It fails on the inputs that matter, because there is no such thing as <em>the</em> formalization of an informal problem. The same goal can be rendered as an optimization (find the best strategy), a constraint-satisfaction problem (find any strategy clearing these bars), a game (competitors respond), a control loop (an ongoing process), or a satisficing search (find good enough, stop). These framings define different success conditions, generate different tasks, and produce different kinds of answers.</p>
+<p>A request like "help me decide whether to launch this product in Algeria" first has to become a clear goal, a set of limits, and a way to measure success — before any planning can start. The simplest fix, one LLM call that says "restate this as a formal problem," fails on exactly the cases that matter, because there's no single right way to turn a loose question into a formal one. The same goal could be framed as a search for the best option, a search for any option that clears some bar, a game between multiple parties, or an ongoing feedback loop — and each framing sets different goals and produces a different kind of answer.</p>
 
-<p>Carnap called this situation <em>explication</em>: replacing a vague concept with a precise one, where candidates are not correct or incorrect, only better or worse along four criteria (similarity, exactness, fruitfulness, simplicity). A single-call formalizer collapses this underdetermination silently. It picks a framing, usually optimization because that genre dominates training data, and the user never learns that a contestable choice was made. The largest ambiguity in the pipeline would be resolved by accident.</p>
+<p>The philosopher Carnap called this kind of choice <em>explication</em>: none of the candidate framings is simply right or wrong — some are just better than others, judged by how closely they match the original idea, how precise they are, how useful they turn out to be, and how simple they are. A single LLM call would quietly pick one framing without weighing the rest — usually the "find the best option" framing, since that's what shows up most in its training data — and the user would never learn that a debatable choice was made for them. The biggest source of ambiguity in the whole pipeline would get settled by accident.</p>
 
 <h3>The five-phase pipeline</h3>
 
-<p><strong>Phase 1: Characterize.</strong> One LLM call extracts structural characteristics: does success admit degrees or is it pass/fail; one actor or several with conflicting interests; one-shot decision or feedback process. The call is catalog-blind. It has no knowledge of which formal structures exist, because a model that knows optimization is on the menu will extract characteristics that justify optimization. Outputs are enums, and code validates each against the allowed vocabulary, since Phase 2 compares exact strings.</p>
+<p><strong>Phase 1: Characterize.</strong> One LLM call pulls out basic facts about the problem: does success come in degrees, is there one actor or several, is this a one-time decision or an ongoing process. It's kept blind to the list of possible framings, because a model that already knows "find the best option" is on the menu will shape its answers to justify picking it. The outputs are fixed categories, checked by code.</p>
 
-<p><strong>Phase 2: Filter.</strong> No LLM. A static, code-owned catalog of structures (optimization, CSP, satisficing, game theory, control loop) carries applicability predicates, plain Python functions over the characteristics. Filtering is set intersection. The general lesson: once a question has been reduced to structured data, push it out of the model. Every question answered by code is one the model cannot answer inconsistently.</p>
+<p><strong>Phase 2: Filter.</strong> No LLM here at all. A fixed list, owned by code, says which framings fit which facts, and filtering is just matching one set against another. The lesson: once a question can be turned into structured data, hand it to code instead of the model — code always answers the same question the same way.</p>
 
-<p><strong>Phase 3: Classify and select.</strong> One batched call labels each surviving structure <em>fits / partially fits / doesn't fit</em>, and is explicitly told that labeling everything "doesn't fit" is acceptable, which counters the model's tendency to force matches. Code buckets by label tier and truncates to a cap the model never saw. If the cut falls between two structures with the same label, the record notes <em>boundary tension</em>: the truncation was arbitrary at the margin, and the record says so.</p>
+<p>The catalog of framings lives in its own file, grown from live-run evidence to twenty structures — decisions, diagnoses, claim checks, forecasts, estimates, designs, schedules, rankings, and more — each with a plain-language definition and one concrete example query, because a classifier matches real problems against real problems better than against theory. What made the non-decision shapes reachable was one extra extracted characteristic: what the asker actually wants handed back — a decision, an explanation, a forecast, an artifact, a verdict on stated claims, a ranking. The first six characteristics couldn't tell "pick an option" apart from "explain a failure," so everything used to get funneled toward the decision-shaped framings.</p>
 
-<p><strong>Phase 4: Generate.</strong> Each selected structure receives its formalization, instructed to treat structures in isolation and to report what the framing drops or alters. A formalization that admits what it discarded is auditable; one that claims perfect fit is hiding its losses.</p>
+<p><strong>Phase 3: Classify and select.</strong> One call labels each surviving framing as <em>fits</em>, <em>partially fits</em>, or <em>doesn't fit</em>, and is told plainly that labeling everything "doesn't fit" is a fine outcome. Code then groups the results by label and trims the list to a limit the model never saw. If the cutoff falls between two framings with the same label, that gets logged as <em>boundary tension</em> — an honest note that the cutoff was a bit arbitrary.</p>
 
-<p><strong>Phase 5: Evaluate and decide.</strong> A final call labels each candidate on Carnap's four criteria (<em>strong / adequate / weak</em>) and is forbidden from declaring a winner; code counts labels and picks. If the top two candidates tie on their label profile, the result is <strong>contested</strong> and the decision block reads <code>selected_structure_id: None</code>. The system does not break ties.</p>
+<p><strong>Phase 4: Generate.</strong> Each chosen framing gets written up in full. The model is told to treat each framing on its own and to note what that framing leaves out or changes.</p>
+
+<p><strong>Phase 5: Evaluate and decide.</strong> One last call rates each candidate against Carnap's four criteria as <em>strong</em>, <em>adequate</em>, or <em>weak</em>, but isn't allowed to pick an overall winner — code counts the labels and decides. If the top two candidates tie, the outcome is marked <strong>contested</strong> and the record shows <code>selected_structure_id: None</code>. The system never breaks a tie on its own.</p>
 
 <h3>Contested records and ratification</h3>
 
-<p>A single sanctioned accessor, <code>get_final_formalization</code>, is the only way downstream code can extract the chosen formalization, and it raises on a contested record. No caller can proceed on a tie because proceeding is unimplementable. Resolution is human: the user is shown the tied framings and their consequences ("finding the single best option" versus "finding any option that clears these bars") and picks one.</p>
+<p>The only approved way to read the result, a function called <code>get_final_formalization</code>, returns nothing when the record is contested: nothing further down the line can move forward on a tie, because there's no sensible way to proceed on one. A human steps in instead: the user sees the tied framings and what each one means in practice ("find the single best option" versus "find any option that clears these bars") and picks.</p>
 
-<p>Whether or not the record was contested, the completed problem specification is then presented for <strong>ratification</strong>: the user confirms the extracted goal, constraints, success criteria, and assumptions. The specification is stamped <code>ratified: true</code>, and a pure predicate, <code>assert_spec_ratified</code>, checks that stamp at the entry of every downstream component. The check is redundant by design. Forgetting it anywhere would fail silently, so it appears everywhere.</p>
+<p>Tied or not, the finished specification then goes to the user for <strong>ratification</strong>: they confirm the goal, the limits, how success will be measured, and the assumptions behind all of it. A flag, <code>ratified: true</code>, gets checked by a function called <code>assert_spec_ratified</code> at the start of every step that follows. That check is repeated on purpose everywhere downstream, since missing it in even one place would fail silently.</p>
+
+<p>One more thing gets extracted before ratification: a checklist of every sub-question the user explicitly named ("verify both of Dana's claims" is two entries plus the decision itself). It's ratified along with the spec, and it carries real weight later — the run isn't allowed to call itself finished while any named item still lacks a completed task covering it (§12). This exists because a live run once answered the main question well and silently skipped a named sub-question; a question the user asked by name is never optional.</p>
 
 <h3>Contextual anchors</h3>
 
-<p>Facts the user declares fixed ("the budget is $40k") are <em>anchors</em>. They are split from raw text by code on delimiters, never by an LLM that might normalize them, then stored verbatim and injected verbatim into every prompt that uses them, labeled as user-declared. The model may never reword an anchor: rewording is reinterpreting, which is precisely the silent drift the system exists to prevent. When later evidence conflicts with an anchor, the system raises a <em>tension flag</em>; it does not overrule the user.</p>
+<p>Facts the user states as fixed ("the budget is $40k") are called <em>anchors</em>. Code, not an LLM, pulls these out of the raw text using clear markers, since an LLM might reword them without meaning to. They're then stored word-for-word and dropped word-for-word into every prompt that needs them, always labeled as coming from the user. Rewording would count as reinterpreting, which is exactly the kind of quiet drift the system is built to stop. If later evidence conflicts with an anchor, the system raises a flag instead of overriding what the user said.</p>
+</section>
 
-<h2 id="ch4"><span class="num">4</span>Memory That Cannot Lie: The Workspace</h2>
+<!-- ================= Page 4 ================= -->
+<section class="page" id="ch4">
+<h2><span class="num">4</span>Memory That Cannot Lie: The Workspace</h2>
 
-<p>Two questions shape everything downstream: where does reasoning state live, and what needs to persist? The default in most multi-agent systems is per-agent state, merged when agents hand off. That works when outputs are independent and combined once. Here they are not independent. When two executors reach conflicting conclusions about the same fact, some module must learn of the disagreement, the final report needs one authoritative version to cite, and a challenged conclusion must be traceable to its origin. Distributed state with no single source of truth produces beliefs nobody decided to hold.</p>
+<p>Where should this state actually live? The usual multi-agent answer, letting each agent keep its own state and merging it later, doesn't work here, because conclusions depend on each other. When two executors disagree about the same fact, something needs to notice; the final report needs one version to point to as authoritative; and a challenged conclusion needs to be traceable back to where it came from. Scattered state with no single source of truth ends up holding beliefs nobody actually decided to hold.</p>
 
-<p>The workspace is a single store holding the entire epistemic state of a run, mutated only through a narrow set of guarded methods, with every mutation logged. It resembles the global-workspace pattern from cognitive science (specialists reading and writing one shared blackboard), with one hardening: agents do not write. Agents submit, and the workspace's own methods decide what is written.</p>
+<p>The workspace is a single store that holds everything a run currently believes. It can only be changed through a narrow set of guarded methods, and every change is logged. Think of it like a shared whiteboard that specialists read and write to — with one added rule: agents don't write to it directly. They submit a proposed change, and the workspace's own code decides what actually gets written.</p>
 
 <h3>Entities</h3>
 
-<p>The workspace stores three entity kinds, each a plain dataclass:</p>
+<p>The workspace stores three kinds of item, each a simple data structure:</p>
 
 <ul>
   <li><strong>Task</strong>: an assignment. Description, kind, dependencies, lifecycle status, and a checkable completion contract (<code>done_when</code>, supplied by the planner, §6).</li>
@@ -463,23 +561,24 @@ flowchart TB
 <figcaption><span class="fig-num">Figure 2.</span>Workspace entities. Tasks produce artifacts; claims cite artifacts as evidence; tasks depend only on tasks that already exist.</figcaption>
 </figure>
 
-<p>The claim-artifact link is bidirectional: a claim lists its evidence artifacts, and an artifact lists the claims it supports. Both lists are written by exactly one method pair, <code>link_evidence</code> and <code>unlink_evidence</code>. Two synced lists maintained by a single writer cannot desynchronize; the same lists maintained by any caller who must remember to update both eventually will, silently. A junction-table design, with explicit link objects, would support per-link metadata and is the standard relational answer; it was deferred until links actually need metadata, a threshold the evidence-type system (§9) is expected to cross.</p>
+<p>A claim and the artifact that backs it are linked both ways: the claim lists its evidence, and the artifact lists the claims it supports. Both lists are updated together by one pair of functions, <code>link_evidence</code> and <code>unlink_evidence</code>, so they can never fall out of sync. A more standard database design would use a separate table to hold extra details about each link; that's been set aside for now, until links actually need those extra details, which is expected to happen soon in §9.</p>
 
 <h3>Access rules</h3>
 
-<p>Every getter returns deep copies, so external code can never hold a live reference to workspace internals. External mutation is not forbidden; it is ineffective, which is stronger. Writers use the internal dictionaries directly, because a writer that read through its own copying getter would mutate a copy and discard it (the "copy trap"). Every write method validates referential integrity before mutating (a claim citing a nonexistent artifact is rejected) and calls the provenance logger itself, without trusting the caller to remember.</p>
+<p>Every method that reads data hands back a full copy, so outside code can never hold a live connection to it. Changing that copy does nothing to the real data. Methods that write data work on the real storage directly instead — reading through a copying method and then editing the result would just edit and throw away a copy, a trap worth naming. Every write also checks that its references are valid and logs itself automatically.</p>
 
-<p><strong>Provenance</strong> is the append-only log of every state change: which actor kind did what, to which entity, when. It makes "where did this belief come from?" a query rather than an investigation. Nothing is ever deleted from the workspace: not failed tasks, not rejected proposals, not retracted claims. Deletion destroys history. Rejection, failure, and contestation are statuses, and statuses are provenance.</p>
+<p><strong>Provenance</strong> is the permanent, ever-growing record of every change: who did what, to which item, and when. "Where did this belief come from?" becomes something you can simply look up. Nothing is ever deleted: rejected, failed, or disputed are just labels on an entry, and those labels are part of the record too.</p>
 
-<p>The task graph is a DAG by construction. Tasks are inserted in order, and <code>add_task</code> accepts only dependency identifiers that already exist. A cycle would require a forward reference, and a forward reference fails as "dependency does not exist," so no cycle detector exists, because no cycle can be written.</p>
+<p>The task graph can never contain a loop, by design: the function that adds a task, <code>add_task</code>, only accepts links to tasks that already exist, so a loop would need to point to a task that doesn't exist yet — which simply fails with "dependency does not exist." There's no loop-checking code, because there's no way to create a loop in the first place. A related method, <code>snapshot()</code>, which takes a full, timestamped copy of everything, comes back into play in §8.</p>
+</section>
 
-<p>The workspace also provides <code>snapshot()</code>, a timestamped deep copy of everything; its role appears with concurrency in §8.</p>
-
-<h2 id="ch5"><span class="num">5</span>What the System Is Entitled to Believe: The Belief System and Its Kernel</h2>
+<!-- ================= Page 5 ================= -->
+<section class="page" id="ch5">
+<h2><span class="num">5</span>What the System Is Entitled to Believe: The Belief System and Its Kernel</h2>
 
 <h3>Three kinds of believed thing</h3>
 
-<p>Not everything the system holds true has the same standing, and each kind obeys different rules:</p>
+<p>Not everything the system treats as true carries the same weight, and each kind follows its own rules:</p>
 
 <table>
   <tr><th>Kind</th><th>Definition</th><th>Governing rule</th></tr>
@@ -488,11 +587,11 @@ flowchart TB
   <tr><td>Contextual anchors</td><td>User-declared fixed facts (§3).</td><td>Never reworded; labeled user-declared in every output; tensions surfaced, never resolved by the system.</td></tr>
 </table>
 
-<p>Because rules quantify over kinds, no rule needs exception clauses: "never reword" applies to anchors, "never user-writable" to invariants, "contestable and evidence-bearing" to claims only.</p>
+<p>Since each rule applies to a whole category, not to individual cases, no rule needs exceptions: "never reword" applies to every anchor, "the user can't edit this" applies to every invariant, and "debatable, needs evidence" applies only to claims.</p>
 
 <h3>The belief ladder</h3>
 
-<p>How should uncertainty be represented? A continuous confidence score is the common choice and supports ranking and Bayesian updating; it was ruled out here for the reasons in §2 — model-produced numbers do not reproduce, and arithmetic over them implies precision the judgments lack. Xogito trades resolution for reproducibility: every claim carries one of four labels. Three form a ladder of earned confidence: <code>unverified</code>, <code>supported</code>, <code>verified</code>. The fourth, <code>contested</code>, is a flag state, not a rung: reachable from anywhere, comparable to nothing, meaning the claim is party to an unresolved contradiction.</p>
+<p>The obvious choice would be a confidence score, since scores are easy to rank and update. But numbers made up by a model don't come out the same way twice, and doing math on them pretends a precision the underlying judgment never had (§2). Xogito trades that precision for consistency: every claim carries one of four labels. Three form a ladder of earned confidence: <code>unverified</code>, <code>supported</code>, and <code>verified</code>. The fourth, <code>contested</code>, isn't a rung on the ladder — it's a flag. Any claim can get this flag at any time, it can't be compared to the other labels, and it just means the claim is caught up in an unresolved conflict.</p>
 
 <figure class="diagram">
 <pre class="mermaid">
@@ -512,19 +611,22 @@ stateDiagram-v2
 <figcaption><span class="fig-num">Figure 3.</span>Belief lifecycle. Promotion requires evidence, one rung per verdict; demotion and contestation require nothing; <code>contested</code> is exited only through adjudication (§10).</figcaption>
 </figure>
 
-<p>Legal transitions live in the <strong>kernel</strong>, a small module of pure predicates with no LLM contact, no state, and no dependencies. Its transition table encodes one asymmetry. Promotion to <code>supported</code> requires cited evidence; promotion to <code>verified</code> requires two pieces of evidence, or one if deductive (a valid derivation suffices alone; an observation never does); there is no path from <code>unverified</code> directly to <code>verified</code>. Demotion and contestation require nothing. A system where doubt is cheaper than confidence fails toward under-confidence, which costs efficiency, rather than over-confidence, which costs correctness.</p>
+<p>Which moves are allowed is decided by the <strong>kernel</strong>, a small block of simple yes/no checks that never talks to an LLM, holds no state, and depends on nothing else. Its rules build in one deliberate imbalance: moving up to <code>supported</code> needs cited evidence; moving up to <code>verified</code> needs two pieces of evidence, or just one if it's a sound logical derivation (a valid derivation is enough on its own, but a single observation never is). There's no shortcut straight from <code>unverified</code> to <code>verified</code>. But dropping a claim's confidence, or flagging it as contested, costs nothing. Doubt is cheap; confidence has to be earned. So when the system has to be wrong, it errs toward too little confidence, which costs some efficiency, rather than too much, which costs correctness.</p>
 
-<p>The kernel checks transitions; the workspace's <code>update_belief_of_claim</code>, the single method through which any belief changes, verifies the cited evidence exists and is linked, invokes the kernel, mutates, and logs. Everything else in the system can only submit proposals to that method.</p>
+<p>The kernel only checks whether a move is allowed. The actual change happens through one method on the workspace, <code>update_belief_of_claim</code> — the only door through which any belief can change. It checks the cited evidence exists and is properly linked, asks the kernel if the move is legal, makes the change, and logs it. Every other part of the system can only ask this one method to make a change — nothing else can touch a belief directly.</p>
+</section>
 
-<h2 id="ch6"><span class="num">6</span>Deciding What to Do: Frontier Planning</h2>
+<!-- ================= Page 6 ================= -->
+<section class="page" id="ch6">
+<h2><span class="num">6</span>Deciding What to Do: Frontier Planning</h2>
 
-<p>Complete up-front planning, one call producing an ordered task list, is reasonable when the task structure is known before execution begins. Run it on open-ended problems and two failures appear. Quality decays down the list: task twelve of fifteen is filler generated because the format demanded fifteen entries. And the plan is built from ignorance: at planning time the system knows nothing it will know after the first investigation, so the back half of any up-front plan is speculation.</p>
+<p>Planning everything up front, in one call that produces a single ordered task list, fails open-ended problems in two ways. First, quality drops off toward the end of the list: task twelve of fifteen often exists only because the format demanded fifteen entries. Second, the plan is built on ignorance: at planning time, the system doesn't yet know what it will learn from its first investigation, so the back half of any upfront plan is really just a guess.</p>
 
-<p>Both failures come from treating planning as an act when the information arrives as a process. Under <strong>frontier planning</strong>, each iteration the planner proposes only the next few tasks that are workable now and would most reduce uncertainty. The full plan is never generated; it emerges across iterations, each informed by what execution just learned. This also resolves the exploration/exploitation trade-off without a tuning parameter: uncertainty-reduction as the standing objective yields broad probes early, when everything is uncertain, and targeted work late, when only specific gaps remain.</p>
+<p>Both problems come from treating planning as a one-time act, when really the information it needs only arrives gradually. Under <strong>frontier planning</strong>, each round the planner proposes only the next few tasks that can be done right now and would cut uncertainty the most. A full plan is never made all at once; it takes shape gradually, each round shaped by what the last round just revealed. Making "reduce uncertainty" the standing goal also settles the classic tradeoff between exploring and exploiting, with no tuning needed: the system probes broadly early on, when everything is uncertain, and narrows in on specific gaps later, once most of the picture is clear.</p>
 
 <h3>Proposer and judge</h3>
 
-<p>Each planning iteration makes exactly two LLM calls, separated by an information wall.</p>
+<p>Each planning round makes exactly two LLM calls, kept apart by a wall neither can see through.</p>
 
 <figure class="diagram">
 <pre class="mermaid">
@@ -543,19 +645,24 @@ sequenceDiagram
 <figcaption><span class="fig-num">Figure 4.</span>One planning iteration. The judge never sees the proposer's reasoning; code validates the judge's output in turn.</figcaption>
 </figure>
 
-<p>The <strong>proposer</strong> receives the ratified specification and a code-built context: one-line summaries of completed artifacts (the planner never reads full content; the summary field exists for this), pending tasks, previously rejected proposals with reasons, and the belief table. It is asked for the minimum workable frontier and told that one task is a fine answer and zero is legitimate. An empty frontier with a stated reason is the loop's stopping signal (§12), not a failure.</p>
+<p>The <strong>proposer</strong> gets the approved specification, plus context built by code: one-line summaries of finished work (never the full content), tasks still pending, past rejections with the reasons why, and the current belief table. It's asked to propose the smallest useful set of next tasks — one task is a perfectly good answer, and proposing nothing, with a stated reason, counts as the signal to stop (§12), not as a failure.</p>
 
-<p>Each proposed task must carry a <code>done_when</code>: a concrete, checkable completion condition. The field serves twice. At generation it filters vague tasks, since a task whose completion cannot be stated should not be proposed. At evaluation it is the contract the work is inspected against (§9). Dependencies are expressed as indices into the proposal list itself, restricted to earlier positions, making cycles unwritable one layer before the workspace makes them uninsertable.</p>
+<p>The proposer also sees the user's named checklist (§3), with a per-item coverage status computed by code. Each proposed task can claim the item it covers, and code validates that claim — an out-of-range index just means "covers nothing," never a crash. Items that assert an absence ("zero documented evidence") are marked as needing two tasks, worded differently from each other and designed to <em>find</em> the thing claimed absent: one search that mirrors the claim and comes back empty closes nothing, and two searches sharing a wording share blind spots. The proposer may not return an empty frontier while any named item is uncovered. It's also told what workers can actually do — recall documented knowledge and derive conclusions, nothing else — so it never proposes benchmarks or measurements no worker could honestly perform.</p>
 
-<p>The <strong>judge</strong> reviews only the structured tasks and labels each <em>sound</em>, <em>vague</em>, <em>duplicate</em>, or <em>invalid_dependency</em>. Its prompt states: do not reject tasks for being unusual, indirect, or seemingly unpromising; judge executability and redundancy, not promise. Without that restriction, judged planning converges on conventional tasks, and unconventional-but-concrete probes are the ones that find what standard analyses miss. Code then validates the judge's own output: every label in vocabulary, every index judged exactly once.</p>
+<p>Every proposed task must include a <code>done_when</code> condition: something concrete and checkable that marks it done. That condition works two ways: at the start, it screens out vague tasks, since a task whose finish line can't be described shouldn't be proposed at all; later, it's the exact standard the finished work gets checked against (§9). Any task a proposal depends on must appear earlier in the same list, so a dependency loop can't even be written down — and the workspace blocks the one remaining way to sneak one in.</p>
 
-<p>Rejected proposals are inserted as tasks with status <code>rejected</code> and the reason attached; future planner iterations see them and stop re-proposing them. A task depending on a rejected task is rejected transitively, with that recorded as the reason.</p>
+<p>The <strong>judge</strong> sees only the structured tasks, nothing else, and labels each one <em>sound</em>, <em>vague</em>, <em>duplicate</em>, or <em>invalid_dependency</em>. It only judges whether a task is doable and non-repeated, never whether it sounds promising, and it's told not to reject a task just for being unusual, since odd-but-concrete tasks often catch things a standard approach would miss. Code then checks the judge's own output: every label has to be real, and every task judged exactly once.</p>
 
-<p>Two fuses sit above the process: a per-iteration proposal cap and a global task budget, both code-owned, both invisible to prompts, both set at roughly double the healthy observed maximum. A tripped fuse raises an exception that halts the run for human review. A planner proposing thirty tasks is malfunctioning, and malfunctions are surfaced, not absorbed. Every loop component carries a fuse with these semantics.</p>
+<p>Rejected tasks stay on record with their reasons; later rounds see this history and don't propose the same thing again. Anything that depends on a rejected task is rejected too. The judge's label travels with each recorded reason — the checkpoint reads it later to tell "everything left was a duplicate" apart from a genuine stall (§12).</p>
 
-<h2 id="ch7"><span class="num">7</span>Dispatch: The Deliberately Thin Scheduler</h2>
+<p>Two safety limits sit above the whole process: a cap per round and an overall budget for the run. Both live in code, are never mentioned in a prompt, and are set at roughly double the highest count normally seen in a healthy run. If either limit is hit, the run stops for a human to check it: a planner proposing thirty tasks at once is malfunctioning, and a malfunction should be visible, not quietly absorbed.</p>
+</section>
 
-<p>The scheduler's entire v1 job: query the workspace for ready tasks (pending tasks whose dependencies are all completed, a pure code query), mark them in-progress, hand them to the executor as a batch, and route results into integration. Dispatch order is FIFO on insertion order, which the planner already made meaningful.</p>
+<!-- ================= Page 7 ================= -->
+<section class="page" id="ch7">
+<h2><span class="num">7</span>Dispatch: The Deliberately Thin Scheduler</h2>
+
+<p>The scheduler's entire job, in this first version, is simple: ask the workspace which tasks are ready (pending tasks whose dependencies are all finished, a plain code lookup), mark them as in progress, hand them to the executor as a batch, and pass the results along to be integrated. Tasks are dispatched in the order they were added, an order the planner has already made meaningful.</p>
 
 <figure class="diagram">
 <pre class="mermaid">
@@ -573,21 +680,24 @@ stateDiagram-v2
 <figcaption><span class="fig-num">Figure 5.</span>Task lifecycle. The scheduler owns the transitions; the executor performs only the work.</figcaption>
 </figure>
 
-<p>Priority scheduling was considered and deferred. Priority matters only under scarcity, when not everything ready can run, and the v1 loop runs every ready task each iteration, so there is nothing to arbitrate. When scarcity arrives, the useful priority signal is a computed graph property (fan-out: how many downstream claims and tasks depend on a task's output), and that data does not exist until the evaluator has run for a while. Building priority now would mean building it on guesses. The scheduler remains a named seam where parallel budgets, retry policy, and computed priority can land without rewiring.</p>
+<p>Priority scheduling was considered and set aside for later. Priority only matters when resources are scarce, and this first version runs every ready task each round, so there's nothing to prioritize between yet. When scarcity does become an issue, the useful signal will be a property of the task graph — how many downstream claims and tasks depend on a given task's output — and that data doesn't exist until the evaluator has been running long enough to produce it. The scheduler is deliberately left as a clean spot where parallel work limits, retry rules, and computed priority can be added later without rewiring anything else.</p>
 
-<p>One boundary decision: the scheduler owns task lifecycle; the executor owns only the work. Executors are the least trusted components, being LLM-adjacent, and hold correspondingly little state-mutation authority. The executor produces, the scheduler bookkeeps, the workspace guards.</p>
+<p>One clear boundary was drawn here: the scheduler owns each task's lifecycle, while the executor owns only the work itself. Executors are the least trusted part of the system, since they sit right next to the LLM, and they're given correspondingly little power to change the system's state.</p>
+</section>
 
-<h2 id="ch8"><span class="num">8</span>Doing the Work: The Executor</h2>
+<!-- ================= Page 8 ================= -->
+<section class="page" id="ch8">
+<h2><span class="num">8</span>Doing the Work: The Executor</h2>
 
 <h3>Entities and messages</h3>
 
-<p>A worker does not return a mutated Task. A Task is an <em>entity</em>: it has identity and a lifecycle inside the workspace. A worker returns a <em>message</em>: an <code>ExecutionResult</code> carrying the content produced, a one-line summary, the factual claims the work asserts, any missing work the worker noticed, and, on failure, the error, attempt count, and elapsed time. Messages travel from producer to consumer and dissolve; this one dissolves at integration into artifacts, claims, statuses, and provenance.</p>
+<p>A worker never hands back a changed Task. A Task is an <em>entity</em> — it has an identity and a life story that live inside the workspace. Instead, a worker returns a <em>message</em>: an <code>ExecutionResult</code> that carries what it produced, a one-line summary, the claims that content supports, any missing work it noticed, and, if it failed, the error, how many tries it took, and how long it ran. Messages travel from producer to consumer, then vanish; this one vanishes once it's turned into artifacts, claims, statuses, and a logged entry.</p>
 
-<p>The distinction enforces the trust architecture physically. If workers returned mutated entities, workers would hold and modify state. Because they return inert messages, "workers never touch the workspace" is the type signature, not a convention. Verdicts (§9) and evaluation contexts are messages for the same reason.</p>
+<p>This is what physically enforces the trust boundary. If workers returned changed entities, they'd effectively be holding state themselves. Because they only ever return inert messages, "workers never touch the workspace" isn't a rule someone has to remember — it's built into the system's structure. Verdicts (§9) and evaluation contexts are messages for the same reason.</p>
 
 <h3>Parallelize the work, serialize the state</h3>
 
-<p>Task execution means LLM calls: slow I/O, worth parallelizing, and the usual source of concurrency bugs. Three standard designs were weighed. The monitor pattern, a mutex on every workspace method, is correct and widely used; here it would guard writes that the design below already makes non-concurrent, at the price of deadlock risk and masked ordering bugs. <em>asyncio</em> is the right tool at thousands of concurrent calls; adopting it for four means rewriting most of the codebase for no throughput gain. Provider batch APIs trade latency for cost with turnaround measured in hours; the loop's next planning step consumes this batch's outputs, so that latency is disqualifying. What remains is a thread pool with one rule: parallelize the work, serialize the state.</p>
+<p>Execution mostly means LLM calls, and those are slow enough that running several at once is worth doing. Looking at the standard options: locking every method would guard writes that already don't conflict by design, at the risk of getting stuck; <em>asyncio</em> makes sense once you're making thousands of calls at once, not just four; and provider batch APIs trade hours of extra waiting for lower cost, but the next planning step needs this batch's results right away. What's left is a thread pool with one rule: do the work in parallel, but make every change to shared state happen one at a time.</p>
 
 <figure class="diagram">
 <pre class="mermaid">
@@ -607,23 +717,30 @@ flowchart TB
 <figcaption><span class="fig-num">Figure 6.</span>One execution batch: a single consistent snapshot in, inert messages out, all writes on one thread in deterministic order.</figcaption>
 </figure>
 
-<p>At batch start the workspace is snapshotted once; every worker receives that same frozen view plus its task, and builds its own execution context. Workers hold no reference to the live workspace. There is no variable in a worker's scope through which a violation could be typed. Up to four workers run in a thread pool; results are collected as they finish and sorted once by task identifier, so integration order (and therefore artifact IDs and provenance order) is deterministic across runs regardless of network timing. Reproducibility is what makes two runs comparable when debugging, and it costs one <code>sort()</code>.</p>
+<p>At the start of each batch, the workspace is copied once; every worker gets that same frozen copy and never touches the live workspace, so nothing in its code could even accidentally break this rule. Up to four workers run at once; their results are then sorted once by task ID, so integration order, artifact IDs, and the log all come out the same way every run. That consistency, which is what makes two runs comparable when debugging, costs nothing more than one sort.</p>
 
-<p>Integration runs serially on the main thread. For each result in ID order: a failed result marks its task failed with the error recorded. A successful one stores the artifact, enters each asserted claim as <code>unverified</code> (the executor asserts; only the evaluator judges), links claim to artifact through the synced-list method, surfaces proposed follow-up work <em>without inserting it</em> (the planner is the sole entry to the task graph; executor suggestions are recorded, not enacted), and then marks the task complete.</p>
+<p>Results get folded in one at a time, on the main thread: a failed result marks its task as failed; a successful one stores the artifact, adds its claims as <code>unverified</code> (the executor only asserts things — only the evaluator judges them), links the evidence through the paired methods that keep the lists in sync, notes any follow-up work it spotted without adding it to the task graph directly (only the planner can add tasks), and marks the task complete.</p>
 
-<p>Because all writes occur on one thread, there is nothing to lock. The workspace carries a tripwire in place of locks: an owner-thread assertion inside the provenance logger, through which every write passes. If a future refactor writes from a worker thread, the failure is immediate and loud, not a silent race.</p>
+<p>Integration also handles agreement. When a new claim says nearly the same thing as an existing one, it doesn't become a twin — the new artifact gets linked to the existing claim as additional evidence. Matching is deliberately cautious: a high bar on word overlap, plus an exact match on negation words, because "asyncio does help" and "asyncio does not help" are one word apart and must never merge. This rule exists because of a live run where two tasks kept agreeing with each other and each agreement became a separate single-source claim — so the two-independent-sources requirement (§9) could never be met by anything, and nothing got established.</p>
 
-<p>Failure handling: every LLM call runs under a timeout, since a hung request would otherwise occupy a worker slot indefinitely. Failures retry with exponential backoff. A worker that exhausts retries returns a failed result. Failure is a result, not an exception, so one task's death never kills the batch. The whole batch runs under a wall-clock fuse.</p>
+<p>Because all writes happen on one thread, there's nothing to lock. In place of locks, there's a tripwire: a check inside the logger, which every write passes through, confirms it's running on the right thread. If a future change accidentally writes from a worker thread, it fails right away, loudly.</p>
 
-<p>Tools (web search, code execution) are deferred with the shape decided: the single LLM call becomes a propose-validate-execute loop, tool calls being one more proposal category for code to dispose of. Tool results become artifacts, and model-generated code becomes stored, re-runnable evidence. Capability grows without changing the trust architecture.</p>
+<p>Every call runs under a time limit; if it fails, it retries with a longer wait each time; if it keeps failing, it returns a failed result. Failure is just a normal result, not a crash, so one task dying never brings down the whole batch — and the batch itself runs under its own overall time limit. When the provider rate-limits a call and states its own retry delay, that stated delay wins over the local guess: the provider knows its own rate window.</p>
 
-<h2 id="ch9"><span class="num">9</span>Judging the Work: The Checkable Evaluator</h2>
+<p>Workers are also told plainly what they can't do: run code, execute benchmarks, measure systems, browse the web, or contact anyone. A task that needs one of those gets "this can't be done from here" as its honest and complete answer — an early run produced a fabricated "benchmark," invented throughput numbers included, which is exactly what this rule and its evaluator-side backstop (§9) exist to stop. Three more output rules came from the same audits: a verdict on a numeric claim states the expected magnitude, never a bare possible/impossible; factual assertions name their sources specifically enough to look up; and any conclusion built on the user's numbers shows its arithmetic.</p>
+
+<p>Tools like web search and code execution haven't been built yet, but their shape is already settled: the LLM call becomes a loop of proposing, checking, and running, so a tool call is just one more kind of proposal for code to check; tool results become artifacts; and model-written code becomes evidence that's stored and can be run again later. The system can gain new abilities without changing who's trusted to do what.</p>
+</section>
+
+<!-- ================= Page 9 ================= -->
+<section class="page" id="ch9">
+<h2><span class="num">9</span>Judging the Work: The Checkable Evaluator</h2>
 
 <h3>The regress</h3>
 
-<p>The evaluator reads artifacts and proposes belief transitions. But the evaluator is an LLM, the same fallible kind of judgment it is judging. Who evaluates the evaluator? A second watcher regresses infinitely; no watcher makes the evaluator's opinions facts by fiat. The framework takes a third position: every verdict must terminate in something code can check. The evaluator's opinions never become state; its proposals do, after mechanical scrutiny.</p>
+<p>The evaluator is an LLM judging another LLM's work — so who checks the evaluator? Adding a second watcher just pushes the same question back one level, forever, and no watcher can turn its own opinion into fact just by declaring it. Xogito takes a third path: every verdict has to end in something code can actually check. The evaluator's opinions never directly change the system's state; only its proposals do, and only after a mechanical check passes them.</p>
 
-<p>A <strong>Verdict</strong>, the evaluator's message type, proposes one transition: claim, target belief, evidence, evidence type, rationale. Two structural decisions in this dataclass carry most of the weight. First, evidence identifiers are assigned by code, not requested from the model: the evidence for a verdict is the artifact under evaluation, which removes a hallucinatable field. Second, the evidence list holds artifact IDs only, so a verdict cannot cite another claim as evidence.</p>
+<p>A <strong>Verdict</strong> proposes exactly one change: which claim, what new confidence level, what evidence, what kind of evidence, and why. Two choices matter most: the evidence's ID is assigned by code, not the model, since the evidence is just the artifact under review — this removes a field the model could otherwise make up. And the evidence list can only hold artifact IDs, never other claims, so a verdict can never point to another claim as its support.</p>
 
 <figure class="diagram">
 <pre class="mermaid">
@@ -636,11 +753,11 @@ flowchart RL
 <figcaption><span class="fig-num">Figure 7.</span>Every chain of support terminates in an executor artifact by construction; claim-to-claim citation is untypeable. Claim A's two artifacts come from two different tasks, the requirement for <code>verified</code>.</figcaption>
 </figure>
 
-<p>The type constraint eliminates bootstrapping: unverified claim A supporting unverified claim B which later supports A, confidence inflating through self-citation. The rule needs no checking because its violation cannot be written.</p>
+<p>That one rule blocks a subtle trap: unverified claim A supports unverified claim B, which later gets cited back in support of A, and confidence inflates out of nowhere through this loop. The rule doesn't need to be checked, because there's no way to even write down a case that breaks it.</p>
 
 <h3>Evidence types</h3>
 
-<p>Different kinds of support fail differently, and the differences change what verification means. The taxonomy has four types (three, with one carrying a flag):</p>
+<p>Different kinds of support fail in different ways, and that difference changes what "verified" should mean. There are four types in total — really three, plus one that's a flag on another:</p>
 
 <table>
   <tr><th>Type</th><th>Rests on</th><th>Checked by</th><th>Characteristic failure</th></tr>
@@ -650,35 +767,39 @@ flowchart RL
   <tr><td>Testimonial<br/><small>"someone said so"</small></td><td>Truth held elsewhere</td><td>Following the pointer; capped below <code>verified</code> permanently</td><td>Chains of testimony that never touch observation or derivation</td></tr>
 </table>
 
-<p>The taxonomy is closed. Proposed fifth types (statistical, consensus, simulated, definitional) collapse into these four under one test: a type exists only if the kernel or evaluator treats it differently. Source quality, independence, and staleness are judgments about evidence <em>within</em> a type, living in rationales and checks. Types decide which rules apply; quality decides whether the rules are satisfied.</p>
+<p>This list of four is meant to be the whole set. Other proposed types, like statistical, consensus, simulated, or definitional evidence, all fold back into these four under one test: a type only counts as separate if the kernel or evaluator actually treats it differently. Judging quality, independence, and staleness happens <em>within</em> a type — the type decides which rules apply, and quality decides whether those rules are met.</p>
 
 <h3>The gauntlet, the dual-pass, and tempo</h3>
 
-<p>The evaluator runs per completed task on an <em>evaluation context</em>: the task's <code>done_when</code>, its artifact in full, and the linked claims with current labels. The problem specification is deliberately absent, because an evaluator that knows the goal starts judging claims by their usefulness to the goal, not by their evidence. One call proposes verdicts for the linked claims and separately reports whether the artifact satisfied its <code>done_when</code> contract.</p>
+<p>The evaluator runs once per finished task, looking at an <em>evaluation context</em>: that task's <code>done_when</code> condition, its full artifact, and the linked claims with their current labels. The original problem spec is left out on purpose: an evaluator that knows the overall goal starts judging claims by how useful they are, not by their actual evidence. One call proposes verdicts and, separately, reports whether the <code>done_when</code> condition was met.</p>
 
-<p>Every raw verdict passes an ordered sequence of pure-code checks, cheap tests first:</p>
+<p>Every raw verdict has to pass a fixed set of code-only checks, cheapest first:</p>
 
 <ol>
   <li><strong>Existence.</strong> The claim exists; labels are in vocabulary; the cited artifact is actually linked to the claim.</li>
   <li><strong>Tempo.</strong> At most one rung of promotion per claim per iteration. The kernel forbids skipping a rung; the tempo rule forbids taking two legal steps in one round, so confidence accretes only across iterations.</li>
-  <li><strong>Type rules.</strong> Testimonial verdicts proposing <code>verified</code> are demoted to <code>supported</code>, with the cap recorded in the rationale. Negative evidence without stated scope is dropped. Quantitative claims (heuristic: digits in the statement) cannot reach <code>verified</code> in a single pass. <code>verified</code> for any claim requires evidence originating from at least two different tasks, a code-checkable proxy for framing-independence.</li>
+  <li><strong>Type rules.</strong> Testimonial verdicts proposing <code>verified</code> are demoted to <code>supported</code>, with the cap recorded. Negative evidence without stated scope is dropped. Quantitative claims cannot reach <code>verified</code> in a single pass. And <code>verified</code> requires evidence originating from at least two different tasks, a code-checkable proxy for framing-independence.</li>
+  <li><strong>Integrity rules.</strong> Added after a live-run audit caught four failure genres slipping through; all apply to promotions only, and all fail toward less confidence. A numeric claim can only rise if its numbers restate the user's own — pinned from the ratified spec by code — or its artifact shows the formula they came from; a number matching neither appeared from nowhere. Claims asserting sign-offs, approvals, or measurements are unpromotable, because no text this system generates is evidence that a human approved something or that a benchmark actually ran. Reaching <code>supported</code> needs evidence from two different tasks — one source echoed five times is still one source — with a lone derivation exempt and an absence claim never exempt. And an artifact produced by a synthesis task is terminal: a conclusion can never circle back as evidence for further claims.</li>
 </ol>
 
-<p>Some checks drop a verdict; others demote and annotate. A too-ambitious verdict usually contains real information wearing too much confidence. Demotion keeps the information and sheds the overreach.</p>
+<p>Some checks simply drop a verdict; others knock it down a level and add a note instead. A verdict that overreaches usually still holds real, useful information wrapped in too much confidence, and dialing it back keeps the information while trimming the overreach.</p>
 
-<p>Verdicts that would <em>raise</em> a belief face one more gate, the <strong>dual-pass</strong>: a second LLM call receives only the claim text and the evidence content, not the first pass's rationale or proposed label, and answers one question: does this evidence state or entail this claim? A second reader shown the first reader's argument becomes an agreement machine, so blindness is the mechanism. Disagreement kills the promotion and is logged. Demotions and contestations skip the dual-pass, consistent with the ladder's asymmetry.</p>
+<p>Any verdict that would <em>raise</em> confidence has to clear one more gate, the <strong>dual-pass</strong>: a second, separate LLM call sees only the claim's text and the evidence itself — never the first pass's reasoning or label — and answers one question: does this evidence actually say or logically require this claim? A second reader shown the first reader's argument tends to just agree with it, so keeping it blind is what makes the check mean something. If the two disagree, the promotion is blocked and the disagreement is logged. Demotions and contested flags skip this second check, in line with how easy it already is to lower confidence.</p>
 
-<p>Surviving verdicts are submitted through <code>update_belief_of_claim</code>, where the kernel checks legality again. The evaluator pre-checks so one bad verdict is dropped without crashing the batch; the workspace re-checks because it trusts no caller. A verdict-count fuse sits above the whole process.</p>
+<p>Verdicts that survive all this get submitted through <code>update_belief_of_claim</code>, where the kernel checks them one more time: the evaluator checks first so one bad verdict doesn't crash the whole batch, and the workspace checks again because it doesn't automatically trust any caller. A cap on how many verdicts can be processed sits above the whole process as a last safeguard.</p>
 
-<p>Bias is handled with fields, not instructions. No prompt says "be skeptical" or "watch for confirmation bias"; such exhortations produce hedging, invented counter-evidence, and vigilance theater. Workers on investigation tasks must fill checkable fields for search scope and counter-evidence encountered; <code>done_when</code> conditions are validated as outcome-neutral (establishing "the presence or absence of X," never presupposing); and the two-task requirement for <code>verified</code> makes one-sided evidence structurally insufficient. Neutrality comes from information hygiene and code-inspectable evidence properties, not from asking a model to police its own psychology.</p>
+<p>Bias is handled through required fields, not through instructions. No prompt just tells the model to "be skeptical" — that kind of instruction tends to produce hedging, made-up counter-evidence, and the look of caution rather than the real thing. Instead, workers doing investigation must fill in checkable fields describing what they searched and any counter-evidence they found; <code>done_when</code> conditions are checked to make sure they don't assume an answer (phrased as "the presence or absence of X," never as if X is already true); and needing evidence from two separate tasks for <code>verified</code> means one-sided evidence structurally isn't enough on its own. Neutrality here comes from disciplined handling of information, not from asking a model to watch its own biases.</p>
+</section>
 
-<h2 id="ch10"><span class="num">10</span>Disagreement as a First-Class State</h2>
+<!-- ================= Page 10 ================= -->
+<section class="page" id="ch10">
+<h2><span class="num">10</span>Disagreement as a First-Class State</h2>
 
-<p>Two claims can each survive the gauntlet on their own evidence and still contradict each other. What should happen when independent reasoning paths disagree? Silent resolution (keep the better-supported claim, drop the other) is the cheapest option and the one models perform by default; it is also how a system comes to report a conclusion whose strongest counter-evidence was discarded without record. Xogito makes the disagreement itself a tracked state.</p>
+<p>Two claims can each pass every check on their own evidence and still directly contradict each other. The cheap way out, quietly keeping the better-supported claim and dropping the other, is also what models tend to do by default; it's also exactly how a system ends up reporting a conclusion after its strongest counter-evidence was thrown away without a trace. Xogito instead treats the disagreement itself as something worth tracking.</p>
 
-<p>After verdicts are applied, the evaluator makes one further pass over the whole belief table with a single narrow question: which pairs of claims cannot both be true? The prompt warns against the common false positive (different emphasis, different scope, and paraphrase are not contradictions) and states that an empty answer is acceptable. Code validates the pairs (both claims exist; no claim contradicts itself), and both members of each genuine pair move to <code>contested</code> through the single door, each carrying a rationale naming its opponent, so the conflict is reconstructable from provenance alone.</p>
+<p>After verdicts are applied, the evaluator scans the entire belief table with one narrow question: which pairs of claims can't both be true? Its prompt warns against the usual false alarms — different emphasis, different scope, and paraphrasing are not contradictions — and it's told that finding nothing is a perfectly fine answer. Code then checks the pairs it finds, and both claims in each genuine pair are moved to <code>contested</code> through that single approved gateway, each carrying a note naming the other, so the whole conflict can be reconstructed later just from the provenance log.</p>
 
-<p>The evaluator detects; it never resolves. A detector that also judges has an incentive to under-detect, since every conflict it finds is work it must then settle, and a judge who found the conflict arrives with a formed opinion. Resolution belongs to a separate component, the <strong>adjudicator</strong>.</p>
+<p>The evaluator only detects contradictions; it never resolves them. A component that both detects and resolves has an incentive to under-detect, since every conflict it finds becomes work it then has to settle — and a judge that found the conflict already arrives with an opinion about it. Resolving it is left to a separate component, the <strong>adjudicator</strong>.</p>
 
 <figure class="diagram">
 <pre class="mermaid">
@@ -693,47 +814,58 @@ flowchart TB
 <figcaption><span class="fig-num">Figure 8.</span>Contradiction handling. One component can only raise flags; a different one can only settle them; <code>contested</code> is exited only through settlement.</figcaption>
 </figure>
 
-<p>The adjudicator examines a contested pair's evidence trails and decides the outcome, optionally spawning <code>verify</code>-kind tasks: the third task kind, reserved for this trigger, which is why the planner is forbidden from proposing one. Verification work is born from contradiction, not from planning. The structural invariant "contradictions are never silently resolved" is thus implemented as a division of capability, not as a rule anyone must remember.</p>
+<p>The adjudicator looks at both sides' evidence trails for a contested pair and decides the outcome, and can create new <code>verify</code>-type tasks if needed — a third kind of task reserved specifically for this purpose, which is exactly why the planner is never allowed to propose one itself. The rule that contradictions are never resolved silently isn't something anyone has to remember to follow; it's simply built into which component is allowed to do what.</p>
+</section>
 
-<h2 id="ch11"><span class="num">11</span>The Judge's Report Card: Calibration</h2>
+<!-- ================= Page 11 ================= -->
+<section class="page" id="ch11">
+<h2><span class="num">11</span>The Judge's Report Card: Calibration</h2>
 
-<p>The evaluator will be wrong in both directions. The dual-pass will block sound promotions, and the adjudicator will overturn promotions that survived every gate. A system that promises calibrated confidence must measure how often its labels turn out to have been right, not merely assert that they mean something.</p>
+<p>The evaluator will get things wrong in both directions: the dual-pass check will sometimes block a promotion that was actually sound, and the adjudicator will sometimes overturn a promotion that had cleared every other gate. A system that claims to give well-calibrated confidence needs to actually measure how often its labels turn out to be right.</p>
 
-<p>Calibration is an append-only log, deliberately outside the workspace: the workspace is one problem's state, while calibration is the evaluator's track record across problems. Entries are outcomes (a dual-pass disagreement; an adjudicator overturning or confirming a promotion; a flagged contradiction dismissed as spurious or confirmed as real), each tagged with the evidence type involved, because types are where patterns concentrate.</p>
+<p>Calibration is a permanent, append-only log kept deliberately separate from the workspace: the workspace holds the state of one problem, while calibration holds the evaluator's track record across many problems over time. Its entries are outcomes — a dual-pass disagreement, an adjudicator confirming or overturning a promotion, a flagged contradiction that was confirmed or dismissed — each tagged with the type of evidence involved, since that's where the patterns tend to show up.</p>
 
-<p>Three consumers justify the log:</p>
+<p>Three uses justify keeping this log:</p>
 
 <ul>
-  <li>The final report can state, next to its labels, the historical overturn rate for promotions backed by each evidence type. Measured confidence, not asserted confidence.</li>
-  <li>The human tuning the system gets data. If testimonial promotions keep dying at adjudication, that is a specific prompt fix with numbers behind it.</li>
+  <li>The final report can state, next to its labels, the historical overturn rate for promotions backed by each evidence type.</li>
+  <li>The human tuning the system gets data: testimonial promotions repeatedly dying at adjudication is a specific prompt fix with numbers behind it.</li>
   <li>A future version can adapt, requiring stricter passes on evidence types with poor records, learning about its own judgment without retraining a weight.</li>
 </ul>
 
-<p>The mechanism is the provenance pattern one level up: provenance records what happened to state, calibration records what happened to judgment.</p>
+<p>This is really the same idea as provenance, just applied one level up: provenance keeps a record of what happened to the system's state, while calibration keeps a record of what happened to its judgment.</p>
+</section>
 
-<h2 id="ch12"><span class="num">12</span>Ending Well: Checkpoint, Compression, Report</h2>
+<!-- ================= Page 12 ================= -->
+<section class="page" id="ch12">
+<h2><span class="num">12</span>Ending Well: Checkpoint, Compression, Report</h2>
 
 <h3>Checkpoint</h3>
 
-<p>The checkpoint decides continuation from signals already flowing: an empty frontier with a stated reason (the planner judges the success criteria satisfied or the remaining uncertainty irreducible); a stall (every proposal rejected, visible as a batch of rejected tasks with reasons); accumulating <code>done_when</code> failures; or the hard iteration ceiling, a code-owned constant.</p>
+<p>The checkpoint decides whether to continue, based on signals that are already available: an empty set of next tasks with a stated reason (either the success criteria are met, or the remaining uncertainty just can't be reduced further); a stall, meaning every proposal in a round got rejected, visible as a batch of rejected tasks with reasons; a buildup of <code>done_when</code> failures; or simply hitting the hard limit on rounds, a fixed constant in the code.</p>
 
-<p>The checkpoint is also the sanctioned venue for criteria revision. Execution sometimes reveals that the ratified success criteria were subtly wrong, the real question adjacent to the asked one. The system may propose a revision; only the user may ratify it, through the same ceremony as the original specification. Self-modifying goals without human sign-off is how optimizers drift, so the door exists and carries the same lock as every other door. Mid-run human edits to tasks or claims were analyzed and deferred with the design settled: revisions will be events, not edits, entering through the same gates as everything else, with the blast radius of a change computed and displayed before it is applied.</p>
+<p>Two refinements came from watching real runs end. A round where every proposal was rejected specifically as a duplicate of covered ground counts as a finished frontier, not a stall — there was nothing new left to propose, and the judge's labels on the rejections are what let code tell the difference. And the run may not stop as a success while any item on the user's named checklist (§3) still lacks a completed covering task — with absence-type items needing two. An empty frontier that skipped a named question isn't done; it's incomplete, and the report says so, naming the dropped items.</p>
+
+<p>The checkpoint is also the one approved place where success criteria can be revised: sometimes, doing the actual work reveals that the approved criteria were subtly off, and the real question turns out to be slightly different from the one originally asked. The system can propose a revision, but only the user can approve it, through the same process used for the original specification. Letting a system quietly redefine its own goals without a human signing off is exactly how optimizing systems drift off course. Making edits mid-run to tasks or claims was set aside for later, but its design is already settled: such changes will be logged as events rather than silent edits, will go through the same checks as everything else, and the size of a change's impact will be calculated and shown before it's applied.</p>
 
 <h3>Compression</h3>
 
-<p>Context windows end; iterations shouldn't have to. The compressor's rule is one distinction: <strong>structured state crosses iteration boundaries verbatim; only narrative is compressed.</strong> The belief table, contested pairs, and tension flags are carried untouched. A summary of a belief table is a different and worse belief table: "mostly supported claims about the market" deletes exactly the labels the system exists to maintain. Prose context (what has been tried, what the terrain looks like) compresses safely because it carries no load-bearing labels. Compression must be lossless on the dimensions that matter, and those dimensions are enumerable.</p>
+<p>Context windows run out, but the reasoning process shouldn't have to stop because of it. The compressor follows one rule: <strong>structured state carries over between rounds untouched; only the narrative gets shortened.</strong> The belief table, contested pairs, and tension flags are carried forward exactly as they are, since a summarized belief table would just be a different, worse belief table. Free-form context, like what's been tried and what the situation looks like so far, can be safely shortened because none of it carries a label the system depends on. Compression has to lose nothing on the dimensions that actually matter, and those dimensions are a short, known list.</p>
 
 <h3>Report</h3>
 
-<p>The report exhibits the reasoning; it does not summarize it. Claims appear with their earned labels and evidence chains, traceable through provenance. Anchors appear labeled as user-declared premises, with tension flags shown, not smoothed over. Negative findings state their search scope. Quantitative claims are phrased as what they are ("two independent sources assert this," never a statistical conclusion the system did not compute). Calibration history contextualizes the labels. Contested claims that were never resolved appear as contested with both sides shown, because a documented conflict is more useful than an arbitrary resolution presented as a conclusion.</p>
+<p>The report displays the reasoning itself; it doesn't just summarize it. Claims appear with the confidence labels they actually earned and the evidence chains behind them, all traceable through provenance. Anchors are shown labeled as user-declared assumptions, with any tension flags displayed rather than smoothed over. Findings of "nothing was found" state exactly what was searched. Claims involving numbers are phrased as what they really are, such as "two independent sources assert this," never dressed up as a statistical conclusion the system never actually computed. The calibration history gives context for how much to trust each label. Contested claims that were never resolved are shown as contested, with both sides laid out, because an honestly documented disagreement is more useful than a made-up resolution presented as a settled conclusion.</p>
 
-<p>A halted run (fuse trip, crash) still produces its report. An audit trail that disappears exactly when things go wrong would be worthless.</p>
+<p>The answer at the top of the report is written from the established claims only — and the writing call is shown the user's named questions and declared facts, verbatim. It has to address every named item in order, saying plainly when the findings didn't settle one rather than guessing or reversing what a finding states, and it shows its arithmetic in the user's own numbers. This rule exists because an early synthesis, shown only the goal and the findings, paraphrased a named question from memory and produced a verdict backwards from what the run's own tasks had concluded.</p>
 
+<p>Even a run that gets halted, whether by a tripped safety limit or a crash, still produces its report. An audit trail that vanishes exactly when something goes wrong would be worthless.</p>
+</section>
+
+<!-- ================= Page 13 ================= -->
+<section class="page" id="ch13">
 <div class="part-head" role="presentation">Part III · The whole</div>
 
-<h2 id="ch13"><span class="num">13</span>The Complete Architecture</h2>
-
-<p>The workspace and kernel sit at the center; every belief change passes their single door (§4, §5). The loop's agents surround them, each holding judgment without authority: the planner proposes tasks (§6), the scheduler dispatches them (§7), the executor produces messages from a frozen snapshot (§8), the evaluator proposes verdicts through the gauntlet and dual-pass (§9), and the adjudicator settles the conflicts the evaluator can only flag (§10). Intake and formalization gate the loop's entrance with a ratified specification (§3). Calibration sits outside the workspace because it outlives any single run (§11). The checkpoint, compressor, and report end the run (§12). The orchestrator sequences these components and passes data; it makes no judgments and contains no LLM calls.</p>
+<h2><span class="num">13</span>The Complete Architecture</h2>
 
 <figure class="diagram">
 <pre class="mermaid">
@@ -779,38 +911,99 @@ flowchart TB
 </pre>
 <figcaption><span class="fig-num">Figure 9.</span>The complete architecture. Every arrow into the workspace is a proposal; every arrow out is a deep copy; every belief change passes the kernel; every abnormality halts for a human, and a halted run still reports.</figcaption>
 </figure>
+</section>
 
-<h2 id="ch14"><span class="num">14</span>Cross-Cutting Principles</h2>
-
-<p>Several rules appear in every component and belong to none of them.</p>
-
-<p><strong>Authority is proportional to checkability.</strong> The kernel, pure code, holds absolute authority and makes no judgments. Models make all the judgments and hold no authority. Workspace methods, gauntlets, and validators are the machinery in between. Trust is never extended to a component, only to a check.</p>
-
-<p><strong>Structure over vigilance.</strong> Cycles are unwritable, not detected (§4, §6); claim-citation is unrepresentable, not forbidden (§9); workers are physically unable to reach state, not instructed to abstain (§8); illegal transitions are rejected by a table, not discouraged by a prompt (§5). Every rule that can be moved from "remembered" to "impossible to violate" is moved.</p>
-
-<p><strong>Information hygiene.</strong> The characterizer never sees the catalog (§3); the proposer never sees the judge's rubric and the judge never sees the proposer's reasoning (§6); the dual-pass never sees the first pass (§9); the evaluator never sees the goal (§9); generators never see caps (§2). What a component is not shown is as much a design decision as what it is shown.</p>
-
-<p><strong>States, not deletions; fuses, not degradation; messages, not shared objects.</strong> History is preserved because audit is the product (§4). Abnormal volume halts for a human because a system that degrades gracefully into nonsense reports the nonsense confidently (§6, §8, §9). Components communicate through dissolving messages because shared mutable objects erode trust boundaries (§8, §9).</p>
-
-<p><strong>Defer from evidence, not imagination.</strong> Tool registries (§8), priority scheduling (§7), junction tables (§4), adaptive calibration (§11), and mid-run edits (§12) were each designed to the point of knowing their shape, then not built, awaiting a concrete second instance. Features grow from observed need.</p>
-
-<p>Every component above (the ladder, the kernel, the gauntlet, the provenance log, the contested state, the calibration file) is a piece of bookkeeping made external, explicit, and mechanically enforced. None of it makes the model smarter; all of it constrains where the model's fallibility can propagate.</p>
+<!-- ================= Pager ================= -->
+<div class="pager" role="navigation" aria-label="Chapter navigation">
+  <button class="pager-btn prev" id="prevBtn" type="button"></button>
+  <span class="pager-ind" id="pageInd" aria-live="polite"></span>
+  <button class="pager-btn next" id="nextBtn" type="button"></button>
+</div>
 
 </main>
 </div>
 
 <script type="module">
-  const root = document.documentElement;
-  const btn = document.getElementById('themeToggle');
-  const isDark = () => root.dataset.theme
-    ? root.dataset.theme === 'dark'
-    : window.matchMedia('(prefers-color-scheme: dark)').matches;
-  btn.addEventListener('click', () => {
-    root.dataset.theme = isDark() ? 'light' : 'dark';
-    renderMermaid();
+  /* ---------- pagination ---------- */
+  const pages = [...document.querySelectorAll('.page')];
+  const titles = [
+    "Reasoning fails through bookkeeping",
+    "LLM proposes, code disposes",
+    "Intake and formalization",
+    "The workspace",
+    "The belief system and kernel",
+    "Frontier planning",
+    "The scheduler",
+    "The executor",
+    "The evaluator",
+    "Contradiction and adjudication",
+    "Calibration",
+    "Checkpoint, compression, report",
+    "Complete architecture"
+  ];
+  const tocLinks = [...document.querySelectorAll('nav.toc a')];
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const pageInd = document.getElementById('pageInd');
+  const progress = document.getElementById('progressBar');
+  let current = -1;
+
+  const label = i => (i + 1) + ' · ' + titles[i];
+
+  function show(i, dir) {
+    if (i < 0 || i >= pages.length || i === current) return;
+    const d = dir || (i > current ? 'fwd' : 'back');
+    current = i;
+    pages.forEach((p, idx) => {
+      const on = idx === i;
+      p.classList.toggle('active', on);
+      p.classList.remove('anim-fwd', 'anim-back');
+      if (on) {
+        void p.offsetWidth; /* restart the animation */
+        p.classList.add(d === 'back' ? 'anim-back' : 'anim-fwd');
+      }
+    });
+    tocLinks.forEach(a =>
+      a.classList.toggle('active', a.getAttribute('href') === '#' + pages[i].id));
+    prevBtn.disabled = i === 0;
+    nextBtn.disabled = i === pages.length - 1;
+    prevBtn.innerHTML = i > 0
+      ? '<span class="dir">← Previous</span>' + label(i - 1) : '';
+    nextBtn.innerHTML = i < pages.length - 1
+      ? '<span class="dir">Next →</span>' + label(i + 1) : '';
+    pageInd.textContent = (i + 1) + ' / ' + pages.length;
+    progress.style.width = ((i + 1) / pages.length * 100) + '%';
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    document.title = 'Xogito: ' + titles[i];
+  }
+
+  function go(i, dir) {
+    show(i, dir);
+    history.pushState({ page: current }, '', '#' + pages[current].id);
+  }
+
+  tocLinks.forEach(a => a.addEventListener('click', e => {
+    const idx = pages.findIndex(p => p.id === a.getAttribute('href').slice(1));
+    if (idx >= 0) { e.preventDefault(); go(idx); }
+  }));
+  prevBtn.addEventListener('click', () => go(current - 1, 'back'));
+  nextBtn.addEventListener('click', () => go(current + 1, 'fwd'));
+  document.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'ArrowRight' && current < pages.length - 1) go(current + 1, 'fwd');
+    if (e.key === 'ArrowLeft' && current > 0) go(current - 1, 'back');
+  });
+  window.addEventListener('popstate', () => {
+    const idx = pages.findIndex(p => p.id === location.hash.slice(1));
+    if (idx >= 0) show(idx);
   });
 
-  // Mermaid via CDN; offline, the diagram source remains visible as text.
+  // initial page from URL hash, default first
+  const startIdx = Math.max(0, pages.findIndex(p => p.id === location.hash.slice(1)));
+  show(startIdx, 'fwd');
+  history.replaceState({ page: startIdx }, '', '#' + pages[startIdx].id);
+
+  /* ---------- mermaid (CDN; offline the diagram source stays visible) ---------- */
   const sources = [...document.querySelectorAll('pre.mermaid')].map(el => ({
     el, code: el.textContent
   }));
@@ -822,10 +1015,28 @@ flowchart TB
     if (!mermaid) return;
     mermaid.initialize({
       startOnLoad: false,
-      theme: isDark() ? 'dark' : 'neutral',
+      theme: 'base',
       themeVariables: {
         fontSize: '13px',
-        fontFamily: 'DM Sans, Segoe UI, sans-serif'
+        fontFamily: 'Inter, Helvetica Neue, Arial, sans-serif',
+        primaryColor: '#ffffff',
+        primaryBorderColor: '#111111',
+        primaryTextColor: '#111111',
+        lineColor: '#111111',
+        secondaryColor: '#f5f5f4',
+        tertiaryColor: '#f5f5f4',
+        clusterBkg: '#f5f5f4',
+        clusterBorder: '#111111',
+        edgeLabelBackground: '#ffffff',
+        actorBkg: '#ffffff',
+        actorBorder: '#111111',
+        actorTextColor: '#111111',
+        actorLineColor: '#111111',
+        signalColor: '#111111',
+        signalTextColor: '#111111',
+        noteBkgColor: '#fdecec',
+        noteBorderColor: '#9e0012',
+        noteTextColor: '#111111'
       }
     });
     for (let i = 0; i < sources.length; i++) {
@@ -837,8 +1048,6 @@ flowchart TB
     }
   }
   renderMermaid();
-  window.matchMedia('(prefers-color-scheme: dark)')
-    .addEventListener('change', () => { if (!root.dataset.theme) renderMermaid(); });
 </script>
 </body>
 </html>

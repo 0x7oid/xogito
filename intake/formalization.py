@@ -674,6 +674,51 @@ def _validate_assumption_impacts(extracted):
     return reviewed
 
 
+CHECKLIST_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "items": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Every EXPLICITLY named sub-question or claim the "
+                           "user asked to verify, decide, or check - one per "
+                           "string, in the user's own framing. Only what the "
+                           "user named; never invent items. Empty if none.",
+        }
+    },
+    "required": ["items"],
+}
+
+
+def extract_verification_checklist(query):
+    # scope fidelity : a named sub-question the user explicitly asked for
+    # ("verify both of Dana's claims") must never be dropped silently .
+    # extracted once , ratified with the spec , coverage code-checked by
+    # the checkpoint . the llm proposes the list ; code validates shape
+    # and count (fuse semantics on the cap - an absurd list is shown to a
+    # human , not truncated into silence)
+    prompt = (
+        "List every sub-question or claim that this problem statement "
+        "EXPLICITLY asks to be verified, checked, or decided. One entry "
+        "per named item, phrased close to the user's own words.\n"
+        "- Include only items the user actually named. Do not invent, "
+        "split hairs, or pad.\n"
+        "- The overall decision itself counts as one item.\n"
+        "- An empty list is valid if the user named nothing specific.\n\n"
+        f"Problem: {query.prompt}\n"
+        f"Scope: {query.scope or 'not specified'}\n"
+    )
+    from parametres import MAX_CHECKLIST_ITEMS
+    items = json.loads(ask_llm(prompt, CHECKLIST_SCHEMA))["items"]
+    cleaned = [str(item).strip() for item in items if str(item).strip()]
+    if len(cleaned) > MAX_CHECKLIST_ITEMS:
+        raise ValueError(
+            f"[checklist] extracted {len(cleaned)} items - over the "
+            f"{MAX_CHECKLIST_ITEMS} fuse. Abnormal - halting for human review."
+        )
+    return cleaned
+
+
 def build_problem_specification(query, record):
     # this raises on contested / no-structure, so we can't build a spec
     # from an unratified decision - the door stays locked.
@@ -705,6 +750,10 @@ def build_problem_specification(query, record):
             "scope": query.scope or "not specified",
             "contextual_anchors": anchors,
             "assumptions": extracted["assumptions"],
+            # named sub-questions the user explicitly asked for . part of
+            # the ratified spec ; the checkpoint refuses stop_success
+            # while any item lacks a completed covering task
+            "verification_checklist": extract_verification_checklist(query),
         },
         # anchors are user-declared GROUND TRUTH ; assumptions are the
         # system's own guesses . the two must never be presented with the

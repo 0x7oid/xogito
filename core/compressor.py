@@ -139,10 +139,35 @@ def split_survivors(workspace, run_log):
 # extractive , code-built summary when synthesis is unavailable
 # ===========================================================================
 
-def _synthesize(goal, surviving, statistics):
+def _synthesize(goal, surviving, statistics, checklist=(), anchors=()):
     claim_lines = []
     for entry in surviving:
         claim_lines.append(f"- {entry['statement']}")
+
+    # FIX (live run , round 3) : the synthesis used to see only goal +
+    # findings , so the user's NAMED questions got paraphrased into the
+    # answer from memory - one verdict came out REVERSED relative to what
+    # the run's own tasks concluded . the named questions are now shown
+    # and each must be answered explicitly or explicitly declared
+    # unsettled ; the user's declared facts are shown verbatim so
+    # arithmetic uses the user's numbers , not remembered ones
+    checklist_block = ""
+    if checklist:
+        numbered = "\n".join(f"{i+1}. {item}" for i, item in enumerate(checklist))
+        checklist_block = (
+            f"\nTHE USER'S NAMED QUESTIONS:\n{numbered}\n"
+            "Your 'answer' must address every named question explicitly, "
+            "in order. For any question the established findings do not "
+            "settle, say plainly that it was not settled by the findings - "
+            "never guess, and never state the reverse of a finding.\n"
+        )
+    anchors_block = ""
+    if anchors:
+        anchors_block = ("\nUSER-DECLARED FACTS (verbatim):\n"
+                         + "\n".join(f"- {a}" for a in anchors) + "\n"
+                         "When a conclusion connects to these numbers, show "
+                         "the arithmetic explicitly (e.g. '3,000/hr x 4 "
+                         "processes = 12,000/hr, meeting the target').\n")
 
     prompt = (
         "Write the top of a report for a non-technical reader.\n"
@@ -150,7 +175,8 @@ def _synthesize(goal, surviving, statistics):
         "knowledge, no speculation. If the findings do not add up to a "
         "specific answer to the goal, your 'answer' must say exactly "
         "that, plainly.\n\n"
-        f"GOAL: {goal}\n\n"
+        f"GOAL: {goal}\n"
+        f"{checklist_block}{anchors_block}\n"
         f"ESTABLISHED FINDINGS:\n" + "\n".join(claim_lines) + "\n\n"
         "For the summary: say what was checked and which findings held "
         "up, in plain everyday words. Do not mention internal component "
@@ -202,9 +228,14 @@ def compress_run(spec, workspace, run_log, halted_by_fuse=""):
     note = ""
 
     if surviving:
-        goal = spec["problem_specification"]["goal"]
+        ps = spec["problem_specification"]
+        goal = ps["goal"]
         try:
-            answer, summary = _synthesize(goal, surviving, statistics)
+            answer, summary = _synthesize(
+                goal, surviving, statistics,
+                checklist=ps.get("verification_checklist", []),
+                anchors=ps.get("contextual_anchors", []),
+            )
         except Exception as error:
             # never a silent guess : fall back to extractive and SAY so
             note = (f"synthesis was unavailable ({type(error).__name__}) - "

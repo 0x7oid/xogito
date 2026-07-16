@@ -96,9 +96,31 @@ def _build_planning_context(spec, workspace):
     for claim in snapshot["claims"]:
         belief_lines.append(f"- [{claim.belief}] {claim.statement}")
 
-    # finally this is the context that will be sent to the planner llm
+    # verification checklist with per-item coverage , computed by code :
+    # an item is covered once a task claiming it exists and is not
+    # rejected/failed . the proposer sees the status so it never returns
+    # an empty frontier while named work remains
+    from agents.checkpoint import required_coverage
     ps = spec["problem_specification"]
+    checklist = ps.get("verification_checklist", [])
+    checklist_lines = []
+    for index, item in enumerate(checklist):
+        active_covering = 0
+        for task in snapshot["tasks"]:
+            if (getattr(task, "covers_checklist_item", -1) == index
+                    and task.status in ("pending", "in_progress", "completed")):
+                active_covering += 1
+        needed = required_coverage(item)
+        if active_covering >= needed:
+            status = "covered"
+        else:
+            status = (f"UNCOVERED - needs {needed} independent task(s), "
+                      f"has {active_covering}")
+        checklist_lines.append(f"- [{index}] [{status}] {item}")
+
+    # finally this is the context that will be sent to the planner llm
     return {
+        "checklist": "\n".join(checklist_lines) or "(none named)",
         "goal": ps["goal"],
         "constraints": ps["constraints"],
         "success_criteria": ps["success_criteria"],
@@ -149,8 +171,14 @@ PROPOSE_SCHEMA = {
                         "type": "string",
                         "description": "Which uncertainty this task reduces, in one clause.",
                     },
+                    "covers_checklist_item": {
+                        "type": "integer",
+                        "description": "Index of the named checklist item this "
+                                       "task directly addresses, or -1 if none.",
+                    },
                 },
-                "required": ["description", "kind", "depends_on", "done_when", "why_now"],
+                "required": ["description", "kind", "depends_on", "done_when",
+                             "why_now", "covers_checklist_item"],
             },
         },
         "frontier_empty_reason": {
@@ -179,7 +207,18 @@ def _propose_tasks(context):
         f"Tasks still pending or running (do not duplicate them):\n{context['pending']}\n\n"
         f"Previously rejected proposals (do not re-propose them):\n{context['rejected']}\n\n"
         f"Claims and their current belief labels:\n{context['beliefs']}\n\n"
+        "NAMED CHECKLIST - sub-questions the user explicitly asked for. "
+        "Every one must be covered by a task before the work can finish:\n"
+        f"{context['checklist']}\n\n"
         "RULES\n"
+        "- If any checklist item above is UNCOVERED, propose a task that "
+        "directly addresses it and set covers_checklist_item to its index. "
+        "NEVER return an empty frontier while an item is UNCOVERED - a "
+        "named question the user asked is never optional.\n"
+        "- An item marked as needing 2 independent tasks asserts an "
+        "absence; its tasks must be worded DIFFERENTLY from each other "
+        "and designed to FIND the thing claimed absent, not to confirm "
+        "its absence.\n"
         "- Propose the MINIMUM set of tasks workable immediately. If one task "
         "is enough, propose one. Do not pad.\n"
         "- kind: 'investigate' (produces information) or 'produce' (produces a "
@@ -367,7 +406,7 @@ def _judge_proposals(proposals, context):
 # A rejected task's dependents are rejected too (they'd dangle otherwise).
 # ---------------------------------------------------------------------------
 
-def _insert_tasks(proposals, judgments, workspace):
+def _insert_tasks(proposals, judgments, workspace, checklist_size=0):
     label_by_index = {}
     for judgment in judgments:
         label_by_index[judgment["index"]] = judgment
@@ -415,6 +454,11 @@ def _insert_tasks(proposals, judgments, workspace):
         task.done_when = proposal["done_when"]
         task.why_now = proposal["why_now"]
         task.rejection_reason = reason
+        # code validates the model's checklist index : anything out of
+        # range means "covers nothing" , never a crash and never a guess
+        claimed_index = proposal.get("covers_checklist_item", -1)
+        if isinstance(claimed_index, int) and 0 <= claimed_index < checklist_size:
+            task.covers_checklist_item = claimed_index
 
         if not rejected:
             # translate proposal indices -> real workspace ids
@@ -463,7 +507,9 @@ def plan_next_tasks(spec, workspace):
 
     proposals = _validate_proposals(proposals, workspace)
     judgments = _judge_proposals(proposals, context)
-    accepted_ids = _insert_tasks(proposals, judgments, workspace)
+    checklist_size = len(
+        spec["problem_specification"].get("verification_checklist", []))
+    accepted_ids = _insert_tasks(proposals, judgments, workspace, checklist_size)
 
     if not accepted_ids:
         # everything was rejected - also a stall signal for the checkpoint,
