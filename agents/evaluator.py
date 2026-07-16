@@ -19,6 +19,7 @@ every verdict must terminate in something code can check :
 '''
 
 import json
+import re
 from dataclasses import dataclass, field
 
 from llm.client import ask_llm, ask_llm_voted, vote_split_tier
@@ -40,6 +41,10 @@ from parametres import (
     VALID_BELIEF_LABELS,
     VALID_EVIDENCE_TYPES,
     VOTING_N,
+    MIN_SOURCE_TASKS_FOR_SUPPORTED,
+    TERMINAL_TASK_KINDS,
+    EXTERNAL_CONFIRMATION_MARKERS,
+    FORMULA_MARKERS,
 )
 
 
@@ -364,7 +369,146 @@ def _check_framing_independence(proposed, claim, artifacts_by_id):
     return CheckResult(True, proposed)
 
 
-def _run_gauntlet(raw_verdicts, context, workspace, promoted_this_iteration):
+# ---------------------------------------------------------------------------
+# integrity gates added after the live-run audit . all four apply to
+# PROMOTIONS only - doubt stays free . all four are drop gates : the
+# fail-safe direction is under-confidence
+# ---------------------------------------------------------------------------
+
+_NUMBER_PATTERN = re.compile(r"\d+(?:[.,]\d+)*")
+
+
+def _extract_numbers(text):
+    # every numeric token in a text , normalized : commas stripped , and a
+    # percentage also recorded as its fraction ("95%" pins both 95 and
+    # 0.95 , so downstream restatements in either form still match)
+    found = set()
+    for index, match in enumerate(_NUMBER_PATTERN.finditer(text)):
+        token = match.group(0).replace(",", "")
+        try:
+            value = float(token)
+        except ValueError:
+            continue
+        found.add(value)
+        end = match.end()
+        if end < len(text) and text[end] == "%":
+            found.add(value / 100.0)
+    return found
+
+
+def _pinned_numbers_from_spec(spec):
+    # ground-truth pinning : every number the USER supplied , collected
+    # from every string in the ratified spec (prompt , scope , anchors ,
+    # criteria - the walk is recursive so the spec's shape never matters) .
+    # pure code , runs once per evaluation round
+    pinned = set()
+
+    def walk(node):
+        if isinstance(node, str):
+            pinned.update(_extract_numbers(node))
+        elif isinstance(node, dict):
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, (list, tuple)):
+            for value in node:
+                walk(value)
+
+    walk(spec)
+    return pinned
+
+
+def _check_external_confirmation(proposed, current_belief, statement):
+    # claims asserting sign-offs / approvals / verifications by people are
+    # unpromotable from run-internal text : no artifact this system
+    # produces is evidence that a human actually approved something .
+    # the honest label is unverified-pending , not a styled endorsement
+    is_promotion = (proposed in BELIEF_ORDER and current_belief in BELIEF_ORDER
+                    and BELIEF_ORDER[proposed] > BELIEF_ORDER[current_belief])
+    if is_promotion:
+        lowered = statement.lower()
+        for marker in EXTERNAL_CONFIRMATION_MARKERS:
+            if marker in lowered:
+                return CheckResult(False, proposed,
+                                   f"asserts an external confirmation ({marker!r}) - "
+                                   "unpromotable without out-of-run evidence ; "
+                                   "correct status is pending , not believed")
+    return CheckResult(True, proposed)
+
+
+def _check_terminal_evidence(proposed, current_belief, evidence_ids,
+                             artifacts_by_id, tasks_by_id):
+    # no circular evidence : an artifact produced by a synthesis/deliverable
+    # task ('produce' kind) is TERMINAL - it is a conclusion , and a
+    # conclusion cited as evidence for further claims is the run agreeing
+    # with itself
+    is_promotion = (proposed in BELIEF_ORDER and current_belief in BELIEF_ORDER
+                    and BELIEF_ORDER[proposed] > BELIEF_ORDER[current_belief])
+    if is_promotion:
+        for artifact_id in evidence_ids:
+            artifact = artifacts_by_id.get(artifact_id)
+            if artifact is None:
+                continue
+            producing_task = tasks_by_id.get(artifact.task_id)
+            if producing_task is not None and producing_task.kind in TERMINAL_TASK_KINDS:
+                return CheckResult(False, proposed,
+                                   f"artifact {artifact_id} is a synthesis output "
+                                   f"({producing_task.kind}-kind task) - terminal , "
+                                   "never evidence")
+    return CheckResult(True, proposed)
+
+
+def _check_source_independence(proposed, evidence_type, is_negative,
+                               claim, artifacts_by_id):
+    # one source echoed n times is one source . leaving unverified needs
+    # evidence from 2+ different tasks , with one exemption : positive
+    # deductive evidence (a derivation is re-traced , not corroborated) .
+    # negative claims never get the exemption - a single search that found
+    # nothing closes no question
+    if proposed == "supported":
+        needs_two = is_negative or evidence_type != "deductive"
+        if needs_two:
+            source_task_ids = set()
+            for artifact_id in claim.evidence_ids:
+                artifact = artifacts_by_id.get(artifact_id)
+                if artifact is not None:
+                    source_task_ids.add(artifact.task_id)
+            if len(source_task_ids) < MIN_SOURCE_TASKS_FOR_SUPPORTED:
+                return CheckResult(False, proposed,
+                                   f"supported needs evidence from "
+                                   f"{MIN_SOURCE_TASKS_FOR_SUPPORTED}+ independent tasks "
+                                   f"(has {len(source_task_ids)})")
+    return CheckResult(True, proposed)
+
+
+def _check_pinned_numbers(proposed, current_belief, statement,
+                          artifact_content, pinned_numbers):
+    # auditable arithmetic : a promotable quantitative claim must either
+    # restate the user's own numbers (the pinned set) or cite an artifact
+    # that shows its working (formula markers) . a number that matches
+    # neither appeared from nowhere - the exact substitution genre the
+    # audit caught (recall=0.92 invented over the user's 0.95)
+    is_promotion = (proposed in BELIEF_ORDER and current_belief in BELIEF_ORDER
+                    and BELIEF_ORDER[proposed] > BELIEF_ORDER[current_belief])
+    if is_promotion and _looks_quantitative(statement):
+        claim_numbers = _extract_numbers(statement)
+        unpinned = claim_numbers - pinned_numbers
+        if unpinned:
+            lowered = artifact_content.lower()
+            shows_working = False
+            for marker in FORMULA_MARKERS:
+                if marker in lowered:
+                    shows_working = True
+                    break
+            if not shows_working:
+                return CheckResult(False, proposed,
+                                   f"numbers {sorted(unpinned)} match no user-pinned "
+                                   "value and the artifact shows no formula - "
+                                   "untraceable arithmetic")
+    return CheckResult(True, proposed)
+
+
+def _run_gauntlet(raw_verdicts, context, workspace, promoted_this_iteration,
+                  pinned_numbers):
     # the driver : gates in order , cheap existence checks first ,
     # judgment-adjacent last . a dropped verdict is logged , never fatal .
     # caps DEMOTE instead of drop - the information survives , the
@@ -378,6 +522,10 @@ def _run_gauntlet(raw_verdicts, context, workspace, promoted_this_iteration):
     artifacts_by_id = {}
     for artifact in snapshot["artifacts"]:
         artifacts_by_id[artifact.id] = artifact
+
+    tasks_by_id = {}
+    for task in snapshot["tasks"]:
+        tasks_by_id[task.id] = task
 
     survivors = []
 
@@ -417,6 +565,14 @@ def _run_gauntlet(raw_verdicts, context, workspace, promoted_this_iteration):
             _check_evidence_linked(proposed, claim, context.artifact_id),              # check 3
             _check_tempo(proposed, claim.belief, claim.id, promoted_this_iteration),   # check 5
             _check_negative_scope(proposed, raw["is_negative"], context.artifact_content),  # check 7
+            # integrity gates (live-run audit) - promotions only , all fail-safe
+            _check_external_confirmation(proposed, claim.belief, claim.statement),     # check 10
+            _check_terminal_evidence(proposed, claim.belief, evidence_ids,
+                                     artifacts_by_id, tasks_by_id),                    # check 11
+            _check_source_independence(proposed, evidence_type, raw["is_negative"],
+                                       claim, artifacts_by_id),                        # check 12
+            _check_pinned_numbers(proposed, claim.belief, claim.statement,
+                                  context.artifact_content, pinned_numbers),           # check 13
         ]
         dropped = False
         for result in drop_gates:
@@ -653,6 +809,10 @@ def evaluate_iteration(spec, workspace, new_artifact_ids=None):
     promoted_this_iteration = set()
     total_raw_verdicts = 0
 
+    # ground-truth pinning : the user's own numbers , extracted from the
+    # ratified spec once per round . code reads the spec ; no prompt does
+    pinned_numbers = _pinned_numbers_from_spec(spec)
+
     for context in contexts:
 
         proposal = _propose_verdicts(context)
@@ -676,7 +836,8 @@ def evaluate_iteration(spec, workspace, new_artifact_ids=None):
                   f"done_when: {proposal['done_when_reason']}")
 
         survivors = _run_gauntlet(
-            proposal["verdicts"], context, workspace, promoted_this_iteration
+            proposal["verdicts"], context, workspace, promoted_this_iteration,
+            pinned_numbers,
         )
 
         for verdict in survivors:

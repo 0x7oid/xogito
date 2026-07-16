@@ -104,6 +104,41 @@ BATCH_BUDGET_SECONDS = 1200        #  20 min wall-clock fuse for a whole batch
 
 MAX_VERDICTS_PER_ITERATION = 40
 
+# epistemic-integrity gates , added after a live-run audit found four
+# failure genres the gauntlet let through : fabricated approvals ,
+# single-source "supported" , synthesis outputs cited back as evidence ,
+# and numbers in claims that never appeared in the user's input .
+# gauntlet policy , not kernel law - these are quality standards
+
+# non-deductive support needs evidence from 2+ DIFFERENT tasks before a
+# claim may leave unverified (citation volume from one source is an echo ,
+# not corroboration) . deductive evidence is exempt : a derivation is
+# checked by re-tracing , not by source-counting
+MIN_SOURCE_TASKS_FOR_SUPPORTED = 2
+
+# outputs of these task kinds are TERMINAL : they may cite evidence but
+# never serve as evidence for another claim in the same run . this is the
+# no-circular-evidence rule - a synthesis feeding its own conclusion back
+# into the evidence graph is bootstrapping with extra steps
+TERMINAL_TASK_KINDS = ("produce",)
+
+# claims asserting real-world events the system cannot observe (sign-offs ,
+# approvals , meetings , verifications by named people) can never be
+# promoted from run-internal artifacts : no llm text is evidence that a
+# human approved something . matching claims stay unverified with the
+# reason recorded
+EXTERNAL_CONFIRMATION_MARKERS = (
+    "sign-off", "signed off", "sign off", "signoff",
+    "approval", "approved by", "approves",
+    "confirmed by", "verified by", "validated by",
+    "agreed to", "stakeholder", "formally accepted",
+)
+
+# a computed number in a claim is only promotable if the artifact shows
+# its working - any of these markers counts as "the formula is visible" .
+# crude v1 presence check , same spirit as SCOPE_MARKERS
+FORMULA_MARKERS = ("=", "formula", "computed as", "calculation", "derived from")
+
 
 # ===========================================================================
 # agents/adjudicator.py
