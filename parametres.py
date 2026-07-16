@@ -40,7 +40,12 @@ EVIDENCE_TYPE_ORDER = {"testimonial": 0, "empirical": 1, "deductive": 2}
 # llm/client.py
 # ===========================================================================
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+# FIX: gemini-2.5-flash was retired for new api keys (404 as of july
+# 2026) . gemini-3-flash-preview kept collapsing under 503 overload plus
+# 429 rate limits mid-run ; the lite tier probes stable and carries much
+# higher throughput quotas , which matters more here than raw capability -
+# a run that finishes beats a smarter run that cannot
+DEFAULT_MODEL = "gemini-3.1-flash-lite"
 
 CALL_TIMEOUT_SECONDS = 300
 
@@ -50,6 +55,15 @@ CALL_TIMEOUT_SECONDS = 300
 # happen with an odd sample count over a binary label
 VOTING_N = 3
 VOTING_TEMPERATURE = 0.7
+
+# transport retry (client-level , distinct from the executor's task
+# retry) : the preview models 503 in spikes that outlast a short backoff ,
+# so the client waits longer between attempts - 3s , 9s , 27s , then
+# capped at 60s per wait (60s also rides out per-minute rate-limit
+# windows , which is what a 429 usually is on this api)
+TRANSPORT_RETRIES = 6
+TRANSPORT_BACKOFF_BASE_SECONDS = 3
+TRANSPORT_MAX_BACKOFF_SECONDS = 60
 
 # the llm call cache : json-lines , append-only , same file discipline as
 # the calibration log

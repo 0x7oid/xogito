@@ -24,16 +24,26 @@ they call , nothing more .
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from google.genai import errors as genai_errors
 import hashlib
 import json
 import os
+import time
 
 from parametres import (
     CALL_TIMEOUT_SECONDS,   # moved to parametres.py - constants live in code , in one place
     DEFAULT_MODEL,
     LLM_CACHE_PATH,
     VOTING_TEMPERATURE,
+    TRANSPORT_RETRIES,
+    TRANSPORT_BACKOFF_BASE_SECONDS,
+    TRANSPORT_MAX_BACKOFF_SECONDS,
 )
+
+# transient transport failures worth retrying at the client : overload ,
+# rate limit , gateway hiccups . anything else raises immediately - a bad
+# request will not get better by asking again
+RETRYABLE_STATUS_CODES = (429, 500, 502, 503, 504)
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
@@ -109,23 +119,45 @@ def ask_llm(prompt, schema, model=DEFAULT_MODEL, temperature=0):
     if temperature == 0 and key in _cache_by_key:
         return _cache_by_key[key]
 
-    response = _get_client().models.generate_content(
-        model=model,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=schema,
-            temperature=temperature,
-            # FIX: the old code passed timeout= directly to
-            # GenerateContentConfig , which has no such field . the real
-            # knob is http_options.timeout , in MILLISECONDS - this is the
-            # native timeout that makes the executor's thread-pool
-            # timeout wrapper unnecessary
-            http_options=types.HttpOptions(timeout=CALL_TIMEOUT_SECONDS * 1000),
-        )
-    )
-    _append_to_cache(key, response.text)
-    return response.text
+    # FIX: a transient 503 ("high demand") used to propagate straight out
+    # of ask_llm and kill whichever component made the call - only the
+    # executor had retries . the transport belongs to the client , so the
+    # client retries transient server errors with backoff for EVERY
+    # caller , and still raises loudly when the retries run out
+    last_error = None
+    for attempt in range(1, TRANSPORT_RETRIES + 1):
+        try:
+            response = _get_client().models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=schema,
+                    temperature=temperature,
+                    # FIX: the old code passed timeout= directly to
+                    # GenerateContentConfig , which has no such field . the real
+                    # knob is http_options.timeout , in MILLISECONDS - this is the
+                    # native timeout that makes the executor's thread-pool
+                    # timeout wrapper unnecessary
+                    http_options=types.HttpOptions(timeout=CALL_TIMEOUT_SECONDS * 1000),
+                )
+            )
+            _append_to_cache(key, response.text)
+            return response.text
+        except genai_errors.APIError as error:
+            if error.code not in RETRYABLE_STATUS_CODES:
+                raise
+            last_error = error
+            print(f"[client] transient {error.code} from the api "
+                  f"(attempt {attempt}/{TRANSPORT_RETRIES}) - backing off")
+            if attempt < TRANSPORT_RETRIES:
+                # exponential backoff , capped : 3s, 9s, 27s, 60s, 60s
+                wait_seconds = TRANSPORT_BACKOFF_BASE_SECONDS ** attempt
+                if wait_seconds > TRANSPORT_MAX_BACKOFF_SECONDS:
+                    wait_seconds = TRANSPORT_MAX_BACKOFF_SECONDS
+                time.sleep(wait_seconds)
+
+    raise last_error
 
 
 # ===========================================================================
