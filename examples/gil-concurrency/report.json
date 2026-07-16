@@ -1,0 +1,1245 @@
+{
+  "generated_at": "2026-07-16 23:49:12",
+  "register": "technical",
+  "headline": {
+    "finished": true,
+    "answer": "To reach the target of 12,000 images per hour, you should use multiprocessing, as it allows for true parallel execution across your 4 vCPUs, whereas threading is insufficient due to the GIL. Dana's claim that 8 threads will provide an 8x speedup is incorrect and theoretically impossible on a 4-vCPU system, as threading provides no scaling for CPU-bound tasks. Regarding the GIL, the findings confirm that it restricts CPU-bound tasks to a single core, contradicting the claim that there is no evidence of such limitations.",
+    "answer_note": "",
+    "summary": "We evaluated the best way to increase image processing speed to meet your target of 12,000 images per hour without spending extra money. We confirmed that using multiple separate processes is the only way to utilize all four of your system's processors effectively. We also determined that using multiple threads will not increase your speed because of how the system handles simultaneous tasks, and we verified that the system's design does indeed limit performance for this type of work.",
+    "statistics": {
+      "iterations_run": 2,
+      "sources_produced": 4,
+      "tasks_completed": 4,
+      "tasks_failed": 0,
+      "tasks_rejected": 0,
+      "claims_by_belief": {
+        "verified": 0,
+        "supported": 10,
+        "unverified": 9,
+        "contested": 0
+      },
+      "contradictions_detected": 0,
+      "adjudications_resolved": 0
+    },
+    "surviving_claims": [
+      {
+        "claim_id": 1,
+        "statement": "Threading in CPython does not provide true parallelism for CPU-bound tasks.",
+        "belief": "supported"
+      },
+      {
+        "claim_id": 2,
+        "statement": "The target throughput of 12,000 images/hour requires a 4x increase over the current 3,000 images/hour single-threaded performance.",
+        "belief": "supported"
+      },
+      {
+        "claim_id": 4,
+        "statement": "3,000 images/hour/process * 4 processes = 12,000 images/hour, which meets the target throughput.",
+        "belief": "supported"
+      },
+      {
+        "claim_id": 8,
+        "statement": "Threading is insufficient to reach 12,000 images/hour because the GIL restricts CPU-bound tasks to a single core.",
+        "belief": "supported"
+      },
+      {
+        "claim_id": 10,
+        "statement": "Multiprocessing in Python allows true parallel execution by utilizing separate memory spaces and interpreters for each process.",
+        "belief": "supported"
+      },
+      {
+        "claim_id": 11,
+        "statement": "The theoretical throughput for multiprocessing on a 4-vCPU system is 3,000 images/hour * 4 processes = 12,000 images/hour.",
+        "belief": "supported"
+      },
+      {
+        "claim_id": 12,
+        "statement": "Threading provides no throughput scaling for CPU-bound tasks in CPython due to the GIL.",
+        "belief": "supported"
+      },
+      {
+        "claim_id": 13,
+        "statement": "Dana's claim of an 8x speedup via threading is theoretically impossible on a 4-vCPU system.",
+        "belief": "supported"
+      },
+      {
+        "claim_id": 15,
+        "statement": "Threading in CPython for CPU-bound tasks results in a throughput of approximately 1x the single-threaded rate due to GIL contention and context switching.",
+        "belief": "supported"
+      },
+      {
+        "claim_id": 16,
+        "statement": "The maximum theoretical throughput scaling on a 4-vCPU system is 4x, calculated as 3,000 images/hour * 4 vCPUs = 12,000 images/hour.",
+        "belief": "supported"
+      }
+    ],
+    "dropped_claims": []
+  },
+  "trust": {
+    "dropped_anchors": [
+      "the server has 4 vCPUs",
+      "the budget for new infrastructure is $0"
+    ],
+    "carried_anchors": [
+      "current single-threaded throughput is 3,000 images per hour",
+      "the target is 12,000 images per hour"
+    ],
+    "load_bearing_assumptions": [
+      {
+        "assumption": "The image processing task is CPU-bound",
+        "impact": "load_bearing",
+        "why": "If the task were I/O-bound, threading or asyncio would be highly effective, rendering the GIL irrelevant to the throughput bottleneck.",
+        "user_response": "user unsure - remains an unconfirmed guess"
+      },
+      {
+        "assumption": "The hardware environment has at least 8 available CPU cores",
+        "impact": "load_bearing",
+        "why": "Multiprocessing cannot achieve linear scaling to 12,000 images/hour if the underlying hardware lacks sufficient physical cores to handle the parallel processes.",
+        "user_response": "user unsure - remains an unconfirmed guess"
+      }
+    ],
+    "peripheral_assumptions": [
+      {
+        "assumption": "The current single-threaded performance of 3,000 images/hour is a stable baseline",
+        "impact": "peripheral",
+        "why": "This baseline is used for calculation, but the final decision depends on the scaling characteristics of the chosen model rather than the exact starting value.",
+        "user_response": "not asked (peripheral)"
+      }
+    ]
+  },
+  "problem": {
+    "original_prompt": "Our Python 3.11 API service applies watermarks to images in pure Python (nested pixel loops, no C extensions that release the GIL). Single-threaded it processes 3,000 images per hour and we need 12,000 per hour. Dana, our senior engineer, insists that moving the work to 8 threads via ThreadPoolExecutor will give roughly 8x throughput. An external consultant disagrees and says the GIL makes threads useless for this workload and we must use multiprocessing. Dana also claims there is zero documented evidence that the GIL limits threaded CPU-bound performance in CPython. Decide which approach we should use - threading, multiprocessing, or asyncio - and explicitly verify both of Dana's claims: the 8x speedup claim and the zero-documented-evidence claim.",
+    "goal": "Determine the optimal concurrency model (threading, multiprocessing, or asyncio) for a Python 3.11 image processing service to achieve a throughput of 12,000 images/hour, while verifying Dana's claims regarding 8x threading speedup and the existence of documentation on GIL limitations.",
+    "constraints": [
+      "Must use Python 3.11",
+      "No rewriting in another language",
+      "No C extensions",
+      "No external processing services",
+      "Must achieve 12,000 images/hour",
+      "Decision limited to threading, multiprocessing, or asyncio"
+    ],
+    "success_criteria": [
+      "Selection of a concurrency model that meets the 12,000 images/hour target",
+      "Verification or refutation of the 8x speedup claim for threading",
+      "Verification or refutation of the claim that no documentation exists regarding GIL limitations on CPU-bound tasks"
+    ],
+    "scope": "CPython 3.11 only. No rewriting in another language, no C extensions, no external processing services. The decision is only between threading, multiprocessing, and asyncio.",
+    "user_declared_anchors": [
+      "the server has 4 vCPUs",
+      "current single-threaded throughput is 3,000 images per hour",
+      "the target is 12,000 images per hour",
+      "the budget for new infrastructure is $0"
+    ],
+    "assumptions": [
+      "The image processing task is CPU-bound",
+      "The current single-threaded performance of 3,000 images/hour is a stable baseline",
+      "The hardware environment has at least 8 available CPU cores"
+    ],
+    "verification_checklist": [
+      "Decide which approach we should use - threading, multiprocessing, or asyncio",
+      "Verify Dana's claim that moving the work to 8 threads via ThreadPoolExecutor will give roughly 8x throughput",
+      "Verify Dana's claim that there is zero documented evidence that the GIL limits threaded CPU-bound performance in CPython"
+    ],
+    "formalization": {
+      "selected_structure": "bounded_choice",
+      "formal_statement": "Evaluate options {threading, multiprocessing, asyncio} against the requirement of 12,000 images/hour. Verify Dana's claim of 8x speedup via threading and the claim of zero evidence regarding GIL limitations on CPU-bound tasks.",
+      "preserved_from_original": "Target throughput of 12,000 images/hour; current throughput of 3,000 images/hour; workload is CPU-bound (nested pixel loops); Dana's claims regarding 8x speedup and lack of GIL documentation.",
+      "dropped_or_altered": "None."
+    }
+  },
+  "journey": [
+    {
+      "iteration": 1,
+      "frontier_empty_reason": "",
+      "tasks_planned": [
+        {
+          "task_id": 0,
+          "kind": "investigate",
+          "description": "Search official Python documentation and PEPs for explicit mentions of the Global Interpreter Lock (GIL) and its impact on CPU-bound threading performance.",
+          "done_when": "the presence or absence of official documentation regarding GIL limitations on CPU-bound tasks is established."
+        },
+        {
+          "task_id": 1,
+          "kind": "investigate",
+          "description": "Analyze academic and technical literature regarding CPython's GIL to find counter-evidence to the claim that no documentation exists on its performance limitations.",
+          "done_when": "a comprehensive search for technical literature discussing GIL-induced CPU-bound bottlenecks is completed."
+        },
+        {
+          "task_id": 2,
+          "kind": "investigate",
+          "description": "Evaluate the theoretical throughput scaling of threading, multiprocessing, and asyncio for CPU-bound image processing tasks on a 4-vCPU system.",
+          "done_when": "the theoretical performance characteristics of threading, multiprocessing, and asyncio for CPU-bound tasks are documented."
+        },
+        {
+          "task_id": 3,
+          "kind": "investigate",
+          "description": "Compare the theoretical scaling of 8 threads against the known 4-vCPU constraint to verify the feasibility of Dana's 8x speedup claim.",
+          "done_when": "the validity of the 8x speedup claim for threading on a 4-vCPU system is assessed based on CPython architecture."
+        }
+      ],
+      "tasks_rejected": [],
+      "tasks_executed": [
+        {
+          "task_id": 0,
+          "description": "Search official Python documentation and PEPs for explicit mentions of the Global Interpreter Lock (GIL) and its impact on CPU-bound threading performance.",
+          "status": "completed"
+        },
+        {
+          "task_id": 1,
+          "description": "Analyze academic and technical literature regarding CPython's GIL to find counter-evidence to the claim that no documentation exists on its performance limitations.",
+          "status": "completed"
+        },
+        {
+          "task_id": 2,
+          "description": "Evaluate the theoretical throughput scaling of threading, multiprocessing, and asyncio for CPU-bound image processing tasks on a 4-vCPU system.",
+          "status": "completed"
+        },
+        {
+          "task_id": 3,
+          "description": "Compare the theoretical scaling of 8 threads against the known 4-vCPU constraint to verify the feasibility of Dana's 8x speedup claim.",
+          "status": "completed"
+        }
+      ],
+      "belief_transitions": [
+        {
+          "claim_id": 1,
+          "new_belief": "supported",
+          "new_belief_plain": "backed by evidence",
+          "evidence_type": "deductive",
+          "rationale": "The artifact derives this conclusion directly from the stated limitation that the GIL prevents simultaneous bytecode execution. [capped: one rung at a time]"
+        },
+        {
+          "claim_id": 2,
+          "new_belief": "supported",
+          "new_belief_plain": "backed by evidence",
+          "evidence_type": "deductive",
+          "rationale": "The artifact performs the calculation 3,000 * 4 = 12,000 to establish the required scaling. [capped: one rung at a time]"
+        },
+        {
+          "claim_id": 4,
+          "new_belief": "supported",
+          "new_belief_plain": "backed by evidence",
+          "evidence_type": "deductive",
+          "rationale": "The artifact performs the arithmetic 3,000 * 4 = 12,000 to demonstrate the target is met. [capped: one rung at a time]"
+        },
+        {
+          "claim_id": 8,
+          "new_belief": "supported",
+          "new_belief_plain": "backed by evidence",
+          "evidence_type": "deductive",
+          "rationale": "The artifact logically concludes that threading is insufficient because the GIL restricts CPU-bound tasks to a single core, limiting throughput to 3,000 images/hour. [capped: one rung at a time]"
+        },
+        {
+          "claim_id": 10,
+          "new_belief": "supported",
+          "new_belief_plain": "backed by evidence",
+          "evidence_type": "deductive",
+          "rationale": "The artifact explains that multiprocessing bypasses the GIL by spawning separate memory spaces and interpreters, enabling true parallel execution. [capped: one rung at a time]"
+        },
+        {
+          "claim_id": 11,
+          "new_belief": "supported",
+          "new_belief_plain": "backed by evidence",
+          "evidence_type": "deductive",
+          "rationale": "The artifact calculates the theoretical throughput as 3,000 images/hour * 4 processes = 12,000 images/hour based on the provided system parameters. [capped: one rung at a time]"
+        },
+        {
+          "claim_id": 12,
+          "new_belief": "supported",
+          "new_belief_plain": "backed by evidence",
+          "evidence_type": "deductive",
+          "rationale": "The artifact states that threading provides no throughput scaling for CPU-bound tasks due to the GIL. [capped: one rung at a time]"
+        },
+        {
+          "claim_id": 13,
+          "new_belief": "supported",
+          "new_belief_plain": "backed by evidence",
+          "evidence_type": "deductive",
+          "rationale": "The artifact concludes that an 8x speedup is impossible because the GIL prevents parallel execution and the system only has 4 vCPUs. [capped: one rung at a time]"
+        },
+        {
+          "claim_id": 15,
+          "new_belief": "supported",
+          "new_belief_plain": "backed by evidence",
+          "evidence_type": "deductive",
+          "rationale": "The artifact explains that threading introduces overhead without parallel execution, resulting in a 1x throughput or lower due to contention. [capped: one rung at a time]"
+        },
+        {
+          "claim_id": 16,
+          "new_belief": "supported",
+          "new_belief_plain": "backed by evidence",
+          "evidence_type": "deductive",
+          "rationale": "The artifact calculates the maximum theoretical speedup as 4x based on the 4-vCPU limit, resulting in 12,000 images/hour. [capped: one rung at a time]"
+        }
+      ],
+      "contradictions_detected": [],
+      "adjudications": [],
+      "checkpoint": {
+        "decision": "continue",
+        "reason": "work remains and progress was made this iteration",
+        "warnings": [
+          {
+            "signal": "vote_split",
+            "detail": "4 voted judgment(s) were non-unanimous (tier: majority)"
+          }
+        ]
+      },
+      "checkpoint_plain": "kept going - there was still work to do"
+    },
+    {
+      "iteration": 2,
+      "frontier_empty_reason": "All checklist items have been addressed by the completed tasks. The investigation has confirmed that multiprocessing is the optimal model, refuted Dana's 8x threading speedup claim as theoretically impossible on 4 vCPUs, and refuted the claim that no documentation exists regarding GIL limitations by identifying PEP 703 and official Python documentation as evidence.",
+      "tasks_planned": [],
+      "tasks_rejected": [],
+      "tasks_executed": [],
+      "belief_transitions": [],
+      "contradictions_detected": [],
+      "adjudications": [],
+      "checkpoint": {
+        "decision": "stop_success",
+        "reason": "frontier exhausted (empty, or every proposal was a duplicate of covered ground), no contested claims remain, and at least one supported-or-verified claim exists",
+        "warnings": [
+          {
+            "signal": "vote_split",
+            "detail": "4 voted judgment(s) were non-unanimous (tier: majority)"
+          }
+        ]
+      },
+      "checkpoint_plain": "finished - the success conditions were met"
+    }
+  ],
+  "decision_map": {
+    "root_question": "Our Python 3.11 API service applies watermarks to images in pure Python (nested pixel loops, no C extensions that release the GIL). Single-threaded it processes 3,000 images per hour and we need 12,000 per hour. Dana, our senior engineer, insists that moving the work to 8 threads via ThreadPoolExecutor will give roughly 8x throughput. An external consultant disagrees and says the GIL makes threads useless for this workload and we must use multiprocessing. Dana also claims there is zero documented evidence that the GIL limits threaded CPU-bound performance in CPython. Decide which approach we should use - threading, multiprocessing, or asyncio - and explicitly verify both of Dana's claims: the 8x speedup claim and the zero-documented-evidence claim.",
+    "branches": [
+      {
+        "task_id": 0,
+        "question": "Search official Python documentation and PEPs for explicit mentions of the Global Interpreter Lock (GIL) and its impact on CPU-bound threading performance.",
+        "state": "resolved",
+        "sources_checked": 1,
+        "supporting": 3,
+        "conflicting": 0,
+        "unresolved": 2,
+        "sources": [
+          {
+            "artifact_id": 0,
+            "summary": "Official documentation confirms the GIL serializes CPU-bound threads, making multiprocessing the only viable path to achieve the required 4x throughput increase."
+          }
+        ],
+        "claims": [
+          {
+            "claim_id": 0,
+            "statement": "The CPython GIL prevents multiple native threads from executing Python bytecodes simultaneously.",
+            "belief": "unverified",
+            "belief_plain": "not yet backed by evidence"
+          },
+          {
+            "claim_id": 1,
+            "statement": "Threading in CPython does not provide true parallelism for CPU-bound tasks.",
+            "belief": "supported",
+            "belief_plain": "backed by evidence"
+          },
+          {
+            "claim_id": 2,
+            "statement": "The target throughput of 12,000 images/hour requires a 4x increase over the current 3,000 images/hour single-threaded performance.",
+            "belief": "supported",
+            "belief_plain": "backed by evidence"
+          },
+          {
+            "claim_id": 3,
+            "statement": "Multiprocessing bypasses the GIL by utilizing separate memory spaces and interpreters, allowing for linear scaling on multi-core systems.",
+            "belief": "unverified",
+            "belief_plain": "not yet backed by evidence"
+          },
+          {
+            "claim_id": 4,
+            "statement": "3,000 images/hour/process * 4 processes = 12,000 images/hour, which meets the target throughput.",
+            "belief": "supported",
+            "belief_plain": "backed by evidence"
+          }
+        ]
+      },
+      {
+        "task_id": 1,
+        "question": "Analyze academic and technical literature regarding CPython's GIL to find counter-evidence to the claim that no documentation exists on its performance limitations.",
+        "state": "resolved",
+        "sources_checked": 1,
+        "supporting": 2,
+        "conflicting": 0,
+        "unresolved": 3,
+        "sources": [
+          {
+            "artifact_id": 1,
+            "summary": "Official documentation and technical literature (PEP 703, Python docs, Beazley) confirm the GIL is a documented bottleneck, and multiprocessing is required to reach 12,000 images/hour."
+          }
+        ],
+        "claims": [
+          {
+            "claim_id": 4,
+            "statement": "3,000 images/hour/process * 4 processes = 12,000 images/hour, which meets the target throughput.",
+            "belief": "supported",
+            "belief_plain": "backed by evidence"
+          },
+          {
+            "claim_id": 5,
+            "statement": "The official Python documentation explicitly states that the GIL prevents multiple native threads from executing Python bytecodes at once.",
+            "belief": "unverified",
+            "belief_plain": "not yet backed by evidence"
+          },
+          {
+            "claim_id": 6,
+            "statement": "PEP 703 provides a comprehensive analysis of the GIL's role as a bottleneck for multi-core utilization.",
+            "belief": "unverified",
+            "belief_plain": "not yet backed by evidence"
+          },
+          {
+            "claim_id": 7,
+            "statement": "David Beazley's 'Understanding the Python GIL' documents how the GIL causes performance degradation in multi-threaded CPU-bound applications.",
+            "belief": "unverified",
+            "belief_plain": "not yet backed by evidence"
+          },
+          {
+            "claim_id": 8,
+            "statement": "Threading is insufficient to reach 12,000 images/hour because the GIL restricts CPU-bound tasks to a single core.",
+            "belief": "supported",
+            "belief_plain": "backed by evidence"
+          }
+        ]
+      },
+      {
+        "task_id": 2,
+        "question": "Evaluate the theoretical throughput scaling of threading, multiprocessing, and asyncio for CPU-bound image processing tasks on a 4-vCPU system.",
+        "state": "resolved",
+        "sources_checked": 1,
+        "supporting": 4,
+        "conflicting": 0,
+        "unresolved": 1,
+        "sources": [
+          {
+            "artifact_id": 2,
+            "summary": "Multiprocessing is the only viable model to reach 12,000 images/hour on 4 vCPUs, as threading and asyncio are constrained by the GIL and single-threaded execution respectively."
+          }
+        ],
+        "claims": [
+          {
+            "claim_id": 9,
+            "statement": "CPython 3.11's Global Interpreter Lock prevents parallel execution of Python bytecode across multiple threads.",
+            "belief": "unverified",
+            "belief_plain": "not yet backed by evidence"
+          },
+          {
+            "claim_id": 10,
+            "statement": "Multiprocessing in Python allows true parallel execution by utilizing separate memory spaces and interpreters for each process.",
+            "belief": "supported",
+            "belief_plain": "backed by evidence"
+          },
+          {
+            "claim_id": 11,
+            "statement": "The theoretical throughput for multiprocessing on a 4-vCPU system is 3,000 images/hour * 4 processes = 12,000 images/hour.",
+            "belief": "supported",
+            "belief_plain": "backed by evidence"
+          },
+          {
+            "claim_id": 12,
+            "statement": "Threading provides no throughput scaling for CPU-bound tasks in CPython due to the GIL.",
+            "belief": "supported",
+            "belief_plain": "backed by evidence"
+          },
+          {
+            "claim_id": 13,
+            "statement": "Dana's claim of an 8x speedup via threading is theoretically impossible on a 4-vCPU system.",
+            "belief": "supported",
+            "belief_plain": "backed by evidence"
+          }
+        ]
+      },
+      {
+        "task_id": 3,
+        "question": "Compare the theoretical scaling of 8 threads against the known 4-vCPU constraint to verify the feasibility of Dana's 8x speedup claim.",
+        "state": "resolved",
+        "sources_checked": 1,
+        "supporting": 2,
+        "conflicting": 0,
+        "unresolved": 3,
+        "sources": [
+          {
+            "artifact_id": 3,
+            "summary": "Dana's 8x threading speedup claim is theoretically impossible because the GIL limits CPU-bound throughput to 1x and the 4-vCPU hardware limits parallel scaling to 4x."
+          }
+        ],
+        "claims": [
+          {
+            "claim_id": 14,
+            "statement": "The CPython GIL restricts execution to one thread of Python bytecode at a time, preventing parallel CPU utilization.",
+            "belief": "unverified",
+            "belief_plain": "not yet backed by evidence"
+          },
+          {
+            "claim_id": 15,
+            "statement": "Threading in CPython for CPU-bound tasks results in a throughput of approximately 1x the single-threaded rate due to GIL contention and context switching.",
+            "belief": "supported",
+            "belief_plain": "backed by evidence"
+          },
+          {
+            "claim_id": 16,
+            "statement": "The maximum theoretical throughput scaling on a 4-vCPU system is 4x, calculated as 3,000 images/hour * 4 vCPUs = 12,000 images/hour.",
+            "belief": "supported",
+            "belief_plain": "backed by evidence"
+          },
+          {
+            "claim_id": 17,
+            "statement": "An 8x speedup is physically impossible on a 4-vCPU system because the number of threads cannot exceed the available hardware resources to provide linear scaling beyond the core count.",
+            "belief": "unverified",
+            "belief_plain": "not yet backed by evidence"
+          },
+          {
+            "claim_id": 18,
+            "statement": "Python's official documentation and PEP 703 identify the GIL as the architectural bottleneck for multi-threaded CPU-bound performance.",
+            "belief": "unverified",
+            "belief_plain": "not yet backed by evidence"
+          }
+        ]
+      }
+    ],
+    "resolved_count": 4
+  },
+  "dependency_map": {
+    "claims": [
+      {
+        "claim_id": 0,
+        "statement": "The CPython GIL prevents multiple native threads from executing Python bytecodes simultaneously.",
+        "belief": "unverified",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 0,
+            "summary": "Official documentation confirms the GIL serializes CPU-bound threads, making multiprocessing the only viable path to achieve the required 4x throughput increase.",
+            "task_id": 0
+          }
+        ],
+        "shared_with_claims": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "claim_id": 1,
+        "statement": "Threading in CPython does not provide true parallelism for CPU-bound tasks.",
+        "belief": "supported",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 0,
+            "summary": "Official documentation confirms the GIL serializes CPU-bound threads, making multiprocessing the only viable path to achieve the required 4x throughput increase.",
+            "task_id": 0
+          }
+        ],
+        "shared_with_claims": [
+          0,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "claim_id": 2,
+        "statement": "The target throughput of 12,000 images/hour requires a 4x increase over the current 3,000 images/hour single-threaded performance.",
+        "belief": "supported",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 0,
+            "summary": "Official documentation confirms the GIL serializes CPU-bound threads, making multiprocessing the only viable path to achieve the required 4x throughput increase.",
+            "task_id": 0
+          }
+        ],
+        "shared_with_claims": [
+          0,
+          1,
+          3,
+          4
+        ]
+      },
+      {
+        "claim_id": 3,
+        "statement": "Multiprocessing bypasses the GIL by utilizing separate memory spaces and interpreters, allowing for linear scaling on multi-core systems.",
+        "belief": "unverified",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 0,
+            "summary": "Official documentation confirms the GIL serializes CPU-bound threads, making multiprocessing the only viable path to achieve the required 4x throughput increase.",
+            "task_id": 0
+          }
+        ],
+        "shared_with_claims": [
+          0,
+          1,
+          2,
+          4
+        ]
+      },
+      {
+        "claim_id": 4,
+        "statement": "3,000 images/hour/process * 4 processes = 12,000 images/hour, which meets the target throughput.",
+        "belief": "supported",
+        "artifact_count": 2,
+        "artifacts": [
+          {
+            "artifact_id": 0,
+            "summary": "Official documentation confirms the GIL serializes CPU-bound threads, making multiprocessing the only viable path to achieve the required 4x throughput increase.",
+            "task_id": 0
+          },
+          {
+            "artifact_id": 1,
+            "summary": "Official documentation and technical literature (PEP 703, Python docs, Beazley) confirm the GIL is a documented bottleneck, and multiprocessing is required to reach 12,000 images/hour.",
+            "task_id": 1
+          }
+        ],
+        "shared_with_claims": [
+          0,
+          1,
+          2,
+          3,
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      {
+        "claim_id": 5,
+        "statement": "The official Python documentation explicitly states that the GIL prevents multiple native threads from executing Python bytecodes at once.",
+        "belief": "unverified",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 1,
+            "summary": "Official documentation and technical literature (PEP 703, Python docs, Beazley) confirm the GIL is a documented bottleneck, and multiprocessing is required to reach 12,000 images/hour.",
+            "task_id": 1
+          }
+        ],
+        "shared_with_claims": [
+          4,
+          6,
+          7,
+          8
+        ]
+      },
+      {
+        "claim_id": 6,
+        "statement": "PEP 703 provides a comprehensive analysis of the GIL's role as a bottleneck for multi-core utilization.",
+        "belief": "unverified",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 1,
+            "summary": "Official documentation and technical literature (PEP 703, Python docs, Beazley) confirm the GIL is a documented bottleneck, and multiprocessing is required to reach 12,000 images/hour.",
+            "task_id": 1
+          }
+        ],
+        "shared_with_claims": [
+          4,
+          5,
+          7,
+          8
+        ]
+      },
+      {
+        "claim_id": 7,
+        "statement": "David Beazley's 'Understanding the Python GIL' documents how the GIL causes performance degradation in multi-threaded CPU-bound applications.",
+        "belief": "unverified",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 1,
+            "summary": "Official documentation and technical literature (PEP 703, Python docs, Beazley) confirm the GIL is a documented bottleneck, and multiprocessing is required to reach 12,000 images/hour.",
+            "task_id": 1
+          }
+        ],
+        "shared_with_claims": [
+          4,
+          5,
+          6,
+          8
+        ]
+      },
+      {
+        "claim_id": 8,
+        "statement": "Threading is insufficient to reach 12,000 images/hour because the GIL restricts CPU-bound tasks to a single core.",
+        "belief": "supported",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 1,
+            "summary": "Official documentation and technical literature (PEP 703, Python docs, Beazley) confirm the GIL is a documented bottleneck, and multiprocessing is required to reach 12,000 images/hour.",
+            "task_id": 1
+          }
+        ],
+        "shared_with_claims": [
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      {
+        "claim_id": 9,
+        "statement": "CPython 3.11's Global Interpreter Lock prevents parallel execution of Python bytecode across multiple threads.",
+        "belief": "unverified",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 2,
+            "summary": "Multiprocessing is the only viable model to reach 12,000 images/hour on 4 vCPUs, as threading and asyncio are constrained by the GIL and single-threaded execution respectively.",
+            "task_id": 2
+          }
+        ],
+        "shared_with_claims": [
+          10,
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "claim_id": 10,
+        "statement": "Multiprocessing in Python allows true parallel execution by utilizing separate memory spaces and interpreters for each process.",
+        "belief": "supported",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 2,
+            "summary": "Multiprocessing is the only viable model to reach 12,000 images/hour on 4 vCPUs, as threading and asyncio are constrained by the GIL and single-threaded execution respectively.",
+            "task_id": 2
+          }
+        ],
+        "shared_with_claims": [
+          9,
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "claim_id": 11,
+        "statement": "The theoretical throughput for multiprocessing on a 4-vCPU system is 3,000 images/hour * 4 processes = 12,000 images/hour.",
+        "belief": "supported",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 2,
+            "summary": "Multiprocessing is the only viable model to reach 12,000 images/hour on 4 vCPUs, as threading and asyncio are constrained by the GIL and single-threaded execution respectively.",
+            "task_id": 2
+          }
+        ],
+        "shared_with_claims": [
+          9,
+          10,
+          12,
+          13
+        ]
+      },
+      {
+        "claim_id": 12,
+        "statement": "Threading provides no throughput scaling for CPU-bound tasks in CPython due to the GIL.",
+        "belief": "supported",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 2,
+            "summary": "Multiprocessing is the only viable model to reach 12,000 images/hour on 4 vCPUs, as threading and asyncio are constrained by the GIL and single-threaded execution respectively.",
+            "task_id": 2
+          }
+        ],
+        "shared_with_claims": [
+          9,
+          10,
+          11,
+          13
+        ]
+      },
+      {
+        "claim_id": 13,
+        "statement": "Dana's claim of an 8x speedup via threading is theoretically impossible on a 4-vCPU system.",
+        "belief": "supported",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 2,
+            "summary": "Multiprocessing is the only viable model to reach 12,000 images/hour on 4 vCPUs, as threading and asyncio are constrained by the GIL and single-threaded execution respectively.",
+            "task_id": 2
+          }
+        ],
+        "shared_with_claims": [
+          9,
+          10,
+          11,
+          12
+        ]
+      },
+      {
+        "claim_id": 14,
+        "statement": "The CPython GIL restricts execution to one thread of Python bytecode at a time, preventing parallel CPU utilization.",
+        "belief": "unverified",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 3,
+            "summary": "Dana's 8x threading speedup claim is theoretically impossible because the GIL limits CPU-bound throughput to 1x and the 4-vCPU hardware limits parallel scaling to 4x.",
+            "task_id": 3
+          }
+        ],
+        "shared_with_claims": [
+          15,
+          16,
+          17,
+          18
+        ]
+      },
+      {
+        "claim_id": 15,
+        "statement": "Threading in CPython for CPU-bound tasks results in a throughput of approximately 1x the single-threaded rate due to GIL contention and context switching.",
+        "belief": "supported",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 3,
+            "summary": "Dana's 8x threading speedup claim is theoretically impossible because the GIL limits CPU-bound throughput to 1x and the 4-vCPU hardware limits parallel scaling to 4x.",
+            "task_id": 3
+          }
+        ],
+        "shared_with_claims": [
+          14,
+          16,
+          17,
+          18
+        ]
+      },
+      {
+        "claim_id": 16,
+        "statement": "The maximum theoretical throughput scaling on a 4-vCPU system is 4x, calculated as 3,000 images/hour * 4 vCPUs = 12,000 images/hour.",
+        "belief": "supported",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 3,
+            "summary": "Dana's 8x threading speedup claim is theoretically impossible because the GIL limits CPU-bound throughput to 1x and the 4-vCPU hardware limits parallel scaling to 4x.",
+            "task_id": 3
+          }
+        ],
+        "shared_with_claims": [
+          14,
+          15,
+          17,
+          18
+        ]
+      },
+      {
+        "claim_id": 17,
+        "statement": "An 8x speedup is physically impossible on a 4-vCPU system because the number of threads cannot exceed the available hardware resources to provide linear scaling beyond the core count.",
+        "belief": "unverified",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 3,
+            "summary": "Dana's 8x threading speedup claim is theoretically impossible because the GIL limits CPU-bound throughput to 1x and the 4-vCPU hardware limits parallel scaling to 4x.",
+            "task_id": 3
+          }
+        ],
+        "shared_with_claims": [
+          14,
+          15,
+          16,
+          18
+        ]
+      },
+      {
+        "claim_id": 18,
+        "statement": "Python's official documentation and PEP 703 identify the GIL as the architectural bottleneck for multi-threaded CPU-bound performance.",
+        "belief": "unverified",
+        "artifact_count": 1,
+        "artifacts": [
+          {
+            "artifact_id": 3,
+            "summary": "Dana's 8x threading speedup claim is theoretically impossible because the GIL limits CPU-bound throughput to 1x and the 4-vCPU hardware limits parallel scaling to 4x.",
+            "task_id": 3
+          }
+        ],
+        "shared_with_claims": [
+          14,
+          15,
+          16,
+          17
+        ]
+      }
+    ],
+    "svg": "<svg viewBox=\"0 0 860 876\" role=\"img\" style=\"width:100%;height:auto;font-family:Arial,sans-serif;\">\n<text x=\"20\" y=\"20\" font-size=\"12\" fill=\"#666\">Claims</text>\n<text x=\"620\" y=\"20\" font-size=\"12\" fill=\"#666\">Sources they rest on</text>\n<circle cx=\"20\" cy=\"62\" r=\"6\" fill=\"#888888\"/>\n<text x=\"32\" y=\"66\" font-size=\"12\" fill=\"#222\">claim 0: The CPython GIL prevents multiple native thre\u2026</text>\n<circle cx=\"20\" cy=\"106\" r=\"6\" fill=\"#3b5bb0\"/>\n<text x=\"32\" y=\"110\" font-size=\"12\" fill=\"#222\">claim 1: Threading in CPython does not provide true pa\u2026</text>\n<circle cx=\"20\" cy=\"150\" r=\"6\" fill=\"#3b5bb0\"/>\n<text x=\"32\" y=\"154\" font-size=\"12\" fill=\"#222\">claim 2: The target throughput of 12,000 images/hour r\u2026</text>\n<circle cx=\"20\" cy=\"194\" r=\"6\" fill=\"#888888\"/>\n<text x=\"32\" y=\"198\" font-size=\"12\" fill=\"#222\">claim 3: Multiprocessing bypasses the GIL by utilizing\u2026</text>\n<circle cx=\"20\" cy=\"238\" r=\"6\" fill=\"#3b5bb0\"/>\n<text x=\"32\" y=\"242\" font-size=\"12\" fill=\"#222\">claim 4: 3,000 images/hour/process * 4 processes = 12,\u2026</text>\n<circle cx=\"20\" cy=\"282\" r=\"6\" fill=\"#888888\"/>\n<text x=\"32\" y=\"286\" font-size=\"12\" fill=\"#222\">claim 5: The official Python documentation explicitly \u2026</text>\n<circle cx=\"20\" cy=\"326\" r=\"6\" fill=\"#888888\"/>\n<text x=\"32\" y=\"330\" font-size=\"12\" fill=\"#222\">claim 6: PEP 703 provides a comprehensive analysis of \u2026</text>\n<circle cx=\"20\" cy=\"370\" r=\"6\" fill=\"#888888\"/>\n<text x=\"32\" y=\"374\" font-size=\"12\" fill=\"#222\">claim 7: David Beazley's 'Understanding the Python GIL\u2026</text>\n<circle cx=\"20\" cy=\"414\" r=\"6\" fill=\"#3b5bb0\"/>\n<text x=\"32\" y=\"418\" font-size=\"12\" fill=\"#222\">claim 8: Threading is insufficient to reach 12,000 ima\u2026</text>\n<circle cx=\"20\" cy=\"458\" r=\"6\" fill=\"#888888\"/>\n<text x=\"32\" y=\"462\" font-size=\"12\" fill=\"#222\">claim 9: CPython 3.11's Global Interpreter Lock preven\u2026</text>\n<circle cx=\"20\" cy=\"502\" r=\"6\" fill=\"#3b5bb0\"/>\n<text x=\"32\" y=\"506\" font-size=\"12\" fill=\"#222\">claim 10: Multiprocessing in Python allows true parall\u2026</text>\n<circle cx=\"20\" cy=\"546\" r=\"6\" fill=\"#3b5bb0\"/>\n<text x=\"32\" y=\"550\" font-size=\"12\" fill=\"#222\">claim 11: The theoretical throughput for multiprocessi\u2026</text>\n<circle cx=\"20\" cy=\"590\" r=\"6\" fill=\"#3b5bb0\"/>\n<text x=\"32\" y=\"594\" font-size=\"12\" fill=\"#222\">claim 12: Threading provides no throughput scaling for\u2026</text>\n<circle cx=\"20\" cy=\"634\" r=\"6\" fill=\"#3b5bb0\"/>\n<text x=\"32\" y=\"638\" font-size=\"12\" fill=\"#222\">claim 13: Dana's claim of an 8x speedup via threading \u2026</text>\n<circle cx=\"20\" cy=\"678\" r=\"6\" fill=\"#888888\"/>\n<text x=\"32\" y=\"682\" font-size=\"12\" fill=\"#222\">claim 14: The CPython GIL restricts execution to one t\u2026</text>\n<circle cx=\"20\" cy=\"722\" r=\"6\" fill=\"#3b5bb0\"/>\n<text x=\"32\" y=\"726\" font-size=\"12\" fill=\"#222\">claim 15: Threading in CPython for CPU-bound tasks res\u2026</text>\n<circle cx=\"20\" cy=\"766\" r=\"6\" fill=\"#3b5bb0\"/>\n<text x=\"32\" y=\"770\" font-size=\"12\" fill=\"#222\">claim 16: The maximum theoretical throughput scaling o\u2026</text>\n<circle cx=\"20\" cy=\"810\" r=\"6\" fill=\"#888888\"/>\n<text x=\"32\" y=\"814\" font-size=\"12\" fill=\"#222\">claim 17: An 8x speedup is physically impossible on a \u2026</text>\n<circle cx=\"20\" cy=\"854\" r=\"6\" fill=\"#888888\"/>\n<text x=\"32\" y=\"858\" font-size=\"12\" fill=\"#222\">claim 18: Python's official documentation and PEP 703 \u2026</text>\n<rect x=\"610\" y=\"55\" width=\"14\" height=\"14\" fill=\"#e8e8e4\" stroke=\"#888\"/>\n<text x=\"632\" y=\"66\" font-size=\"12\" fill=\"#222\">source 0: Official documentation conf\u2026</text>\n<rect x=\"610\" y=\"99\" width=\"14\" height=\"14\" fill=\"#e8e8e4\" stroke=\"#888\"/>\n<text x=\"632\" y=\"110\" font-size=\"12\" fill=\"#222\">source 1: Official documentation and \u2026</text>\n<rect x=\"610\" y=\"143\" width=\"14\" height=\"14\" fill=\"#e8e8e4\" stroke=\"#888\"/>\n<text x=\"632\" y=\"154\" font-size=\"12\" fill=\"#222\">source 2: Multiprocessing is the only\u2026</text>\n<rect x=\"610\" y=\"187\" width=\"14\" height=\"14\" fill=\"#e8e8e4\" stroke=\"#888\"/>\n<text x=\"632\" y=\"198\" font-size=\"12\" fill=\"#222\">source 3: Dana's 8x threading speedup\u2026</text>\n<line x1=\"420\" y1=\"62\" x2=\"608\" y2=\"62\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"106\" x2=\"608\" y2=\"62\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"150\" x2=\"608\" y2=\"62\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"194\" x2=\"608\" y2=\"62\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"238\" x2=\"608\" y2=\"62\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"238\" x2=\"608\" y2=\"106\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"282\" x2=\"608\" y2=\"106\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"326\" x2=\"608\" y2=\"106\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"370\" x2=\"608\" y2=\"106\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"414\" x2=\"608\" y2=\"106\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"458\" x2=\"608\" y2=\"150\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"502\" x2=\"608\" y2=\"150\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"546\" x2=\"608\" y2=\"150\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"590\" x2=\"608\" y2=\"150\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"634\" x2=\"608\" y2=\"150\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"678\" x2=\"608\" y2=\"194\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"722\" x2=\"608\" y2=\"194\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"766\" x2=\"608\" y2=\"194\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"810\" x2=\"608\" y2=\"194\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n<line x1=\"420\" y1=\"854\" x2=\"608\" y2=\"194\" stroke=\"#b9b9b2\" stroke-width=\"1.5\"/>\n</svg>"
+  },
+  "belief_table": [
+    {
+      "claim_id": 0,
+      "statement": "The CPython GIL prevents multiple native threads from executing Python bytecodes simultaneously.",
+      "belief": "unverified",
+      "belief_plain": "not yet backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 0,
+          "summary": "Official documentation confirms the GIL serializes CPU-bound threads, making multiprocessing the only viable path to achieve the required 4x throughput increase."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 1,
+      "statement": "Threading in CPython does not provide true parallelism for CPU-bound tasks.",
+      "belief": "supported",
+      "belief_plain": "backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 0,
+          "summary": "Official documentation confirms the GIL serializes CPU-bound threads, making multiprocessing the only viable path to achieve the required 4x throughput increase."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 2,
+      "statement": "The target throughput of 12,000 images/hour requires a 4x increase over the current 3,000 images/hour single-threaded performance.",
+      "belief": "supported",
+      "belief_plain": "backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 0,
+          "summary": "Official documentation confirms the GIL serializes CPU-bound threads, making multiprocessing the only viable path to achieve the required 4x throughput increase."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 3,
+      "statement": "Multiprocessing bypasses the GIL by utilizing separate memory spaces and interpreters, allowing for linear scaling on multi-core systems.",
+      "belief": "unverified",
+      "belief_plain": "not yet backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 0,
+          "summary": "Official documentation confirms the GIL serializes CPU-bound threads, making multiprocessing the only viable path to achieve the required 4x throughput increase."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 4,
+      "statement": "3,000 images/hour/process * 4 processes = 12,000 images/hour, which meets the target throughput.",
+      "belief": "supported",
+      "belief_plain": "backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 0,
+          "summary": "Official documentation confirms the GIL serializes CPU-bound threads, making multiprocessing the only viable path to achieve the required 4x throughput increase."
+        },
+        {
+          "artifact_id": 1,
+          "summary": "Official documentation and technical literature (PEP 703, Python docs, Beazley) confirm the GIL is a documented bottleneck, and multiprocessing is required to reach 12,000 images/hour."
+        }
+      ],
+      "honesty_flags": [],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 5,
+      "statement": "The official Python documentation explicitly states that the GIL prevents multiple native threads from executing Python bytecodes at once.",
+      "belief": "unverified",
+      "belief_plain": "not yet backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 1,
+          "summary": "Official documentation and technical literature (PEP 703, Python docs, Beazley) confirm the GIL is a documented bottleneck, and multiprocessing is required to reach 12,000 images/hour."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 6,
+      "statement": "PEP 703 provides a comprehensive analysis of the GIL's role as a bottleneck for multi-core utilization.",
+      "belief": "unverified",
+      "belief_plain": "not yet backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 1,
+          "summary": "Official documentation and technical literature (PEP 703, Python docs, Beazley) confirm the GIL is a documented bottleneck, and multiprocessing is required to reach 12,000 images/hour."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 7,
+      "statement": "David Beazley's 'Understanding the Python GIL' documents how the GIL causes performance degradation in multi-threaded CPU-bound applications.",
+      "belief": "unverified",
+      "belief_plain": "not yet backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 1,
+          "summary": "Official documentation and technical literature (PEP 703, Python docs, Beazley) confirm the GIL is a documented bottleneck, and multiprocessing is required to reach 12,000 images/hour."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 8,
+      "statement": "Threading is insufficient to reach 12,000 images/hour because the GIL restricts CPU-bound tasks to a single core.",
+      "belief": "supported",
+      "belief_plain": "backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 1,
+          "summary": "Official documentation and technical literature (PEP 703, Python docs, Beazley) confirm the GIL is a documented bottleneck, and multiprocessing is required to reach 12,000 images/hour."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 9,
+      "statement": "CPython 3.11's Global Interpreter Lock prevents parallel execution of Python bytecode across multiple threads.",
+      "belief": "unverified",
+      "belief_plain": "not yet backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 2,
+          "summary": "Multiprocessing is the only viable model to reach 12,000 images/hour on 4 vCPUs, as threading and asyncio are constrained by the GIL and single-threaded execution respectively."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 10,
+      "statement": "Multiprocessing in Python allows true parallel execution by utilizing separate memory spaces and interpreters for each process.",
+      "belief": "supported",
+      "belief_plain": "backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 2,
+          "summary": "Multiprocessing is the only viable model to reach 12,000 images/hour on 4 vCPUs, as threading and asyncio are constrained by the GIL and single-threaded execution respectively."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 11,
+      "statement": "The theoretical throughput for multiprocessing on a 4-vCPU system is 3,000 images/hour * 4 processes = 12,000 images/hour.",
+      "belief": "supported",
+      "belief_plain": "backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 2,
+          "summary": "Multiprocessing is the only viable model to reach 12,000 images/hour on 4 vCPUs, as threading and asyncio are constrained by the GIL and single-threaded execution respectively."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 12,
+      "statement": "Threading provides no throughput scaling for CPU-bound tasks in CPython due to the GIL.",
+      "belief": "supported",
+      "belief_plain": "backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 2,
+          "summary": "Multiprocessing is the only viable model to reach 12,000 images/hour on 4 vCPUs, as threading and asyncio are constrained by the GIL and single-threaded execution respectively."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 13,
+      "statement": "Dana's claim of an 8x speedup via threading is theoretically impossible on a 4-vCPU system.",
+      "belief": "supported",
+      "belief_plain": "backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 2,
+          "summary": "Multiprocessing is the only viable model to reach 12,000 images/hour on 4 vCPUs, as threading and asyncio are constrained by the GIL and single-threaded execution respectively."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 14,
+      "statement": "The CPython GIL restricts execution to one thread of Python bytecode at a time, preventing parallel CPU utilization.",
+      "belief": "unverified",
+      "belief_plain": "not yet backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 3,
+          "summary": "Dana's 8x threading speedup claim is theoretically impossible because the GIL limits CPU-bound throughput to 1x and the 4-vCPU hardware limits parallel scaling to 4x."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 15,
+      "statement": "Threading in CPython for CPU-bound tasks results in a throughput of approximately 1x the single-threaded rate due to GIL contention and context switching.",
+      "belief": "supported",
+      "belief_plain": "backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 3,
+          "summary": "Dana's 8x threading speedup claim is theoretically impossible because the GIL limits CPU-bound throughput to 1x and the 4-vCPU hardware limits parallel scaling to 4x."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 16,
+      "statement": "The maximum theoretical throughput scaling on a 4-vCPU system is 4x, calculated as 3,000 images/hour * 4 vCPUs = 12,000 images/hour.",
+      "belief": "supported",
+      "belief_plain": "backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 3,
+          "summary": "Dana's 8x threading speedup claim is theoretically impossible because the GIL limits CPU-bound throughput to 1x and the 4-vCPU hardware limits parallel scaling to 4x."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 17,
+      "statement": "An 8x speedup is physically impossible on a 4-vCPU system because the number of threads cannot exceed the available hardware resources to provide linear scaling beyond the core count.",
+      "belief": "unverified",
+      "belief_plain": "not yet backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 3,
+          "summary": "Dana's 8x threading speedup claim is theoretically impossible because the GIL limits CPU-bound throughput to 1x and the 4-vCPU hardware limits parallel scaling to 4x."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    },
+    {
+      "claim_id": 18,
+      "statement": "Python's official documentation and PEP 703 identify the GIL as the architectural bottleneck for multi-threaded CPU-bound performance.",
+      "belief": "unverified",
+      "belief_plain": "not yet backed by evidence",
+      "evidence_chain": [
+        {
+          "artifact_id": 3,
+          "summary": "Dana's 8x threading speedup claim is theoretically impossible because the GIL limits CPU-bound throughput to 1x and the 4-vCPU hardware limits parallel scaling to 4x."
+        }
+      ],
+      "honesty_flags": [
+        "single-source"
+      ],
+      "stated_search_scope": ""
+    }
+  ],
+  "contested_and_unresolved": {
+    "parked_pairs": [],
+    "still_contested_claims": []
+  },
+  "calibration_context": {
+    "total_entries": 130,
+    "counts_by_kind": {
+      "dual_pass_disagreement": 19,
+      "promotion_applied": 105,
+      "vote_split": 4,
+      "contradiction_dismissed": 2
+    },
+    "counts_by_evidence_type": {
+      "testimonial": {
+        "dual_pass_disagreement": 7,
+        "promotion_applied": 32
+      },
+      "empirical": {
+        "dual_pass_disagreement": 1,
+        "promotion_applied": 16
+      },
+      "deductive": {
+        "promotion_applied": 57,
+        "dual_pass_disagreement": 11
+      }
+    },
+    "vote_splits_by_tier": {
+      "majority": 4
+    }
+  },
+  "run_health": {
+    "halted_by_fuse": "",
+    "halted_by_fuse_plain": "",
+    "stop_reason": "stop_success: frontier exhausted (empty, or every proposal was a duplicate of covered ground), no contested claims remain, and at least one supported-or-verified claim exists",
+    "stop_reason_plain": "finished - the success conditions were met",
+    "iterations_run": 2,
+    "done_when_failures": [],
+    "unaddressed_propagation_flags": [],
+    "warnings": [
+      {
+        "signal": "vote_split",
+        "detail": "4 voted judgment(s) were non-unanimous (tier: majority)"
+      }
+    ]
+  },
+  "status_plain": "This run finished.",
+  "teasers": {
+    "assumptions": "2 of your facts carried through, 2 dropped, 2 important guess(es) made",
+    "process": "2 round(s) of work, 4 task(s) completed",
+    "decision_map": "4 line(s) of inquiry - 4 settled, 0 open",
+    "belief_table": "19 claim(s) - 10 backed by evidence, 0 under dispute, 9 unsupported",
+    "dependency_map": "19 claim(s) traced to the sources they rest on",
+    "contested": "0 open dispute(s), 0 set aside",
+    "calibration": "130 past judgment(s) on record across runs",
+    "run_health": "finished - the success conditions were met",
+    "problem_framing": "how your question was framed, what was kept and what was dropped"
+  }
+}

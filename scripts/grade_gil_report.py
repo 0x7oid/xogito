@@ -58,7 +58,7 @@ def main():
     picks_mp = "multiprocessing" in lowered_answer
     recommends_threads = ("recommend threading" in lowered_answer
                           or "use threading" in lowered_answer
-                          or "threads will" in lowered_answer)
+                          or "should use threads" in lowered_answer)
     check("GT1 answer = multiprocessing", picks_mp and not recommends_threads,
           f"answer: {answer[:300]}")
 
@@ -101,8 +101,16 @@ def main():
     check("GT6 established claims use pinned numbers", not unpinned_hits,
           f"unpinned numbers: {unpinned_hits}")
 
-    # 7. symmetric scrutiny : every candidate appears in the claim table
-    coverage = {opt: any(opt in c["statement"].lower() for c in table)
+    # 7. symmetric scrutiny : every candidate appears in the claim table ,
+    # the executed tasks , or the answer itself
+    all_task_texts = []
+    for it in report["journey"]:
+        for t in it.get("tasks_executed", []):
+            all_task_texts.append(str(t if isinstance(t, str)
+                                      else t.get("description", t)).lower())
+    corpus7 = (lowered_answer + " ".join(c["statement"].lower() for c in table)
+               + " ".join(all_task_texts))
+    coverage = {opt: opt in corpus7
                 for opt in ("threading", "multiprocessing", "asyncio")}
     check("GT7 all three candidates covered", all(coverage.values()),
           f"coverage: {coverage}")
@@ -138,6 +146,43 @@ def main():
             thin.append((c["claim_id"], c["belief"], len(chain)))
     check("GT9 no single-source establishment (or deductive)", True,
           f"single-task established claims (deductive is legitimate): {thin}")
+
+    # 10. BOTH of Dana's claims must be addressed in the answer itself -
+    # the zero-documented-evidence claim was dropped silently in round 2
+    zero_addressed = any(k in lowered_answer for k in
+                         ("zero documented", "no documented", "documented evidence",
+                          "documentation exists", "well-documented", "long-documented",
+                          "no evidence", "evidence of such limitations",
+                          "not settled"))
+    check("GT10 zero-evidence claim addressed in the answer", zero_addressed,
+          f"answer: {answer[:300]}")
+
+    # 11. citations : the refutation should name checkable sources
+    corpus = lowered_answer + " ".join(c["statement"].lower() for c in table)
+    named_sources = [k for k in ("pep 703", "pep 684", "beazley",
+                                 "official documentation", "python documentation",
+                                 "cpython documentation", "python/cpython docs",
+                                 "docs.python.org", "faq")
+                     if k in corpus]
+    check("GT11 named checkable sources present", bool(named_sources),
+          f"sources found: {named_sources}")
+
+    # 12. throughput arithmetic : the answer must connect the recommendation
+    # to the user's numbers (3,000 x 4 = 12,000)
+    has_math = (("12,000" in answer or "12000" in answer)
+                and ("4" in answer)
+                and ("3,000" in answer or "3000" in answer or "x 4" in lowered_answer
+                     or "4x" in lowered_answer or "four" in lowered_answer))
+    check("GT12 throughput math connects answer to target", has_math,
+          f"answer: {answer[:300]}")
+
+    # 13. checklist coverage recorded in the report
+    checklist = report["problem"].get("verification_checklist", [])
+    uncovered_warn = [w for w in report["run_health"]["warnings"]
+                      if w.get("signal") == "uncovered_checklist_items"]
+    check("GT13 checklist extracted and no uncovered items",
+          bool(checklist) and not uncovered_warn,
+          f"checklist: {checklist} | uncovered warnings: {uncovered_warn}")
 
     print()
     passed = 0

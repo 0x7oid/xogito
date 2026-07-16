@@ -1,4 +1,4 @@
-25/25 tests passed:
+27/27 tests passed:
   [PASS] pinning: user numbers extracted from any spec shape
   [PASS] pinning: invented number without a formula is dropped
   [PASS] pinning: user's own number promotes ; formula-backed number promotes
@@ -17,6 +17,8 @@
   [PASS] ladder: tempo forbids a second promotion in one iteration
   [PASS] checkpoint: all proposals rejected as duplicates = frontier exhausted
   [PASS] checkpoint: a vague rejection keeps it a stall
+  [PASS] checkpoint: a named checklist item without a COMPLETED task stays uncovered
+  [PASS] checkpoint: all items covered by completed tasks = nothing uncovered
   [PASS] catalog: every structure is reachable by some characteristics combo
   [PASS] catalog: every primary_output surfaces at least one candidate
   [PASS] catalog: ids unique , every entry carries the required fields

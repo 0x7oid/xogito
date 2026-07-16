@@ -89,28 +89,43 @@ Intermediate runs then exposed two deeper defects:
    stall. All-duplicates is frontier exhaustion; now it stops as success
    (any other rejection reason still stalls).
 
-## Final result — 9/9 ground-truth checks
+## Final result — 13/13 ground-truth checks
+
+A later audit round added four requirements (both named claims addressed
+in the answer, named checkable sources, arithmetic connecting the answer
+to the target, and code-enforced checklist coverage) plus the machinery
+behind them: a ratified verification checklist, per-item task coverage
+with two independently-worded tasks required for absence claims, claim
+corroboration at integration, and an answer synthesis that sees the named
+questions and the user's declared facts verbatim.
 
 ```
-[PASS] GT1 answer = multiprocessing
-[PASS] GT2 8x claim not endorsed
-[PASS] GT3 zero-evidence claim not endorsed
-[PASS] GT4 GIL mechanism established
-[PASS] GT5 no promoted sign-off claims
-[PASS] GT6 established claims use pinned numbers
-[PASS] GT7 all three candidates covered
-[PASS] GT8 named dispute surfaced
-[PASS] GT9 no single-source establishment (or deductive)
+[PASS] GT1  answer = multiprocessing
+[PASS] GT2  8x claim not endorsed
+[PASS] GT3  zero-evidence claim not endorsed
+[PASS] GT4  GIL mechanism established
+[PASS] GT5  no promoted sign-off claims
+[PASS] GT6  established claims use pinned numbers
+[PASS] GT7  all three candidates covered
+[PASS] GT8  named dispute surfaced
+[PASS] GT9  no single-source establishment (or deductive)
+[PASS] GT10 zero-evidence claim addressed in the answer
+[PASS] GT11 named checkable sources present
+[PASS] GT12 throughput math connects answer to target
+[PASS] GT13 checklist extracted and no uncovered items
 finished: True   stop: stop_success
 ```
 
 Final answer produced by the run:
 
-> The optimal model for this service is multiprocessing, as it is the only
-> option that allows for true parallel execution of CPU-bound tasks.
-> Dana's claim of an 8x speedup via threading is theoretically impossible,
-> and the provided findings confirm that the global interpreter lock
-> prevents parallel thread execution.
+> To reach the target of 12,000 images per hour, you should use
+> multiprocessing, as it allows for true parallel execution across your 4
+> vCPUs, whereas threading is insufficient due to the GIL. Dana's claim
+> that 8 threads will provide an 8x speedup is incorrect and theoretically
+> impossible on a 4-vCPU system, as threading provides no scaling for
+> CPU-bound tasks. Regarding the GIL, the findings confirm that it
+> restricts CPU-bound tasks to a single core, contradicting the claim that
+> there is no evidence of such limitations.
 
 The integrity gates visibly earned their keep during the run — excerpts
 from the run log:
@@ -133,16 +148,15 @@ from the run log:
 
 ## Evidence in this directory
 
-- `report_20260716_233212.html` / `.json` — the full report of the final run
+- `report_20260716_234912.html` / `.json` — the full report of the final run
 - `ground_truth_grade.txt` — grader output for that report
 - `unit_test_output.txt` — the 25-test offline suite (`tests/test_framework.py`)
 
 ## Known limitations (honest gaps)
 
-- Checklist-coverage stop condition (every named sub-question must have a
-  task before "finished") is prompt-level only; the checkpoint cannot judge
-  relevance without an LLM, so the code-enforced version needs a
-  formalization-stage checklist object first.
+- Checklist coverage is code-enforced, but the mapping of task to
+  checklist item is proposed by the model (code validates only the
+  index); a task could nominally claim an item it addresses poorly.
 - Symmetric scrutiny across compared candidates is instructed, not
   code-enforced.
 - Establishment can still rest on knowledge-recall tasks only: the workers

@@ -27,7 +27,7 @@ from agents.evaluator import (
     _check_tempo,
 )
 from agents.executor import _find_corroborated_claim, _claim_profile
-from agents.checkpoint import _all_rejected_as_duplicates
+from agents.checkpoint import _all_rejected_as_duplicates, _uncovered_checklist_items
 from intake.catalog import CHARACTERISTIC_VALUES, STRUCTURE_CATALOG
 from intake.formalization import filter_structures
 from core.kernel import assert_spec_ratified
@@ -50,10 +50,12 @@ class FakeClaim:
 
 
 class FakeTask:
-    def __init__(self, kind, status="completed", rejection_reason=""):
+    def __init__(self, kind, status="completed", rejection_reason="",
+                 covers_checklist_item=-1):
         self.kind = kind
         self.status = status
         self.rejection_reason = rejection_reason
+        self.covers_checklist_item = covers_checklist_item
 
 
 PASSED = []
@@ -253,6 +255,28 @@ def _():
         FakeTask("investigate", "rejected", "vague: no checkable done_when"),
     ]}
     assert not _all_rejected_as_duplicates(record, snapshot)
+
+
+@test("checkpoint: a named checklist item without a COMPLETED task stays uncovered")
+def _():
+    spec = {"problem_specification": {"verification_checklist":
+            ["verify the 8x claim", "verify the zero-evidence claim"]}}
+    snapshot = {"tasks": [
+        FakeTask("investigate", "completed", covers_checklist_item=0),
+        FakeTask("investigate", "pending", covers_checklist_item=1),
+    ]}
+    uncovered = _uncovered_checklist_items(spec, snapshot)
+    assert uncovered == ["verify the zero-evidence claim"], uncovered
+
+
+@test("checkpoint: all items covered by completed tasks = nothing uncovered")
+def _():
+    spec = {"problem_specification": {"verification_checklist": ["a", "b"]}}
+    snapshot = {"tasks": [
+        FakeTask("investigate", "completed", covers_checklist_item=0),
+        FakeTask("produce", "completed", covers_checklist_item=1),
+    ]}
+    assert _uncovered_checklist_items(spec, snapshot) == []
 
 
 # ===========================================================================

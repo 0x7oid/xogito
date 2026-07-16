@@ -79,6 +79,20 @@ CALIBRATION_LOG_PATH = os.path.join(PROJECT_ROOT, "calibration_log.jsonl")
 
 
 # ===========================================================================
+# intake/formalization.py
+# ===========================================================================
+
+# scope fidelity (live stress run , round 2) : a named sub-question
+# ("verify Dana's zero-documented-evidence claim") was dropped silently
+# even though the user asked for it EXPLICITLY . the fix is structural :
+# every named question or claim-to-verify is extracted into a checklist
+# at formalization , ratified with the spec , and the checkpoint refuses
+# stop_success while any item lacks a completed covering task . the cap
+# is a fuse : more extracted items than this halts for a human
+MAX_CHECKLIST_ITEMS = 10
+
+
+# ===========================================================================
 # agents/planner.py
 # ===========================================================================
 
