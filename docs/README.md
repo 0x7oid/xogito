@@ -14,8 +14,6 @@ Xogito keeps that from happening by doing the model's bookkeeping externally, in
 
 Powered by a structured reasoning engine, Xogito processes queries through an orchestrated system where logic and verification are handled independently. By relying on a strict shared state, it ensures the model cannot easily hallucinate or overwrite facts to fit a flawed hypothesis.
 
-**Goal:** Given an open-ended, ambiguous question, arrive at a conclusion you can actually rely on — and if the evidence doesn't support one, say so, instead of guessing with confidence.
-
 Concretely, it:
 
 * **Separates** observations from assumptions.
@@ -93,5 +91,6 @@ xogito/
 ## Design Philosophy
 
 Every component in the `xogito/` architecture exists to answer a specific failure mode common in naive LLM pipelines. That reasoning is written up in `docs/DESIGN.html`.
+[HIGHLY RECOMMENDED TO READ THE DESIGN DOCUMENT]
 
 *Xogito — from the same root as cogito, "I think." The difference is what happens after the thinking.*
