@@ -52,25 +52,25 @@ fight - trust rebuilds gradually , per LEGAL_MOVES) .
 import json
 from dataclasses import dataclass, field
 
-from llm.client import ask_llm
+from llm.client import ask_llm, ask_llm_voted, vote_split_tier
 from workspace import Workspace   # NOTE: reconcile flat vs graph.workspace layout before orchestrator wiring
-from core.calibration import log_adjudication_outcome, log_contradiction_outcome
+# (layout reconciled : workspace stays a root-level module , see orchestrator.py header)
+from core.calibration import log_adjudication_outcome, log_contradiction_outcome, log_vote_split
 
 
 # ===========================================================================
 # PARAMETRES (fuses and vocabularies - code-owned , invisible to any prompt)
 # ===========================================================================
 
-MAX_PAIRS_PER_ITERATION = 20   # runaway-fight fuse
-
-BELIEF_ORDER = {"unverified": 0, "supported": 1, "verified": 2}
-# contested is absent on purpose : flag state , not a rung , comparable to nothing
-
-# evidence type strength ordering for the lexicographic tiebreaker .
-# a label ordering , not a score : deductive beats empirical beats
-# testimonial . this mirrors the taxonomy's ceilings (a derivation can
-# verify alone ; a pointer never can)
-EVIDENCE_TYPE_ORDER = {"testimonial": 0, "empirical": 1, "deductive": 2}
+# the fuse and the shared orderings moved to parametres.py - one file owns
+# every constant , and no prompt can ever see them
+from parametres import (
+    MAX_PAIRS_PER_ITERATION,
+    BELIEF_ORDER,
+    # contested is absent on purpose : flag state , not a rung , comparable to nothing
+    EVIDENCE_TYPE_ORDER,
+    VOTING_N,
+)
 
 # contest record tiers . a label ordering , not a count-as-score
 CONTEST_RECORD_ORDER = {"untested": 0, "tested": 1, "battle_tested": 2}
@@ -284,6 +284,15 @@ GATE_SCHEMA = {
 }
 
 
+def _extract_gate_label(response_text):
+    # the label a vote is counted on : an empty gap list IS a pass .
+    # labels only - the voting machinery never reads the gap content
+    result = json.loads(response_text)
+    if result["gaps"]:
+        return "fail"
+    return "pass"
+
+
 def _run_entailment_gate(case_file):
     prompt = (
         "Read the evidence, then the claim. List every part of the claim "
@@ -298,7 +307,17 @@ def _run_entailment_gate(case_file):
         f"EVIDENCE:\n{_render_evidence_block(case_file)}\n\n"
         f"CLAIM: {case_file.statement}\n"
     )
-    result = json.loads(ask_llm(prompt, GATE_SCHEMA))
+    # self-consistency voting at the gate : n blind samples , majority on
+    # the pass/fail label . a non-unanimous vote is itself calibration
+    # data - logged as a label tier , never a ratio
+    majority_label, split, winning_response = ask_llm_voted(
+        prompt, GATE_SCHEMA, _extract_gate_label, VOTING_N,
+    )
+    tier = vote_split_tier(split)
+    if tier != "unanimous":
+        log_vote_split("adjudicator_entailment_gate", tier, majority_label)
+
+    result = json.loads(winning_response)
 
     case_file.gate_gaps = result["gaps"]
     case_file.gate_passed = len(result["gaps"]) == 0
@@ -524,7 +543,7 @@ def _resolve_undercut(workspace, attacker, target, propagation_flags):
     # removal both live in provenance forever) , then RECOMPUTE the target
     discredited_ids = []
     for artifact_id, _content in target.evidence_artifacts:
-        workspace.unlink_evidence(target.claim_id, artifact_id)
+        workspace.unlink_evidence(target.claim_id, artifact_id, actor="adjudicator")
         discredited_ids.append(artifact_id)
 
         # principle 10 (propagation) : every OTHER claim leaning on this

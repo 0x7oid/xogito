@@ -38,11 +38,9 @@ from llm.client import ask_llm
 from core.kernel import assert_spec_ratified
 from workspace import Workspace, Task
 
-
-MAX_TASKS_PER_ITERATION = 10   
-MAX_TOTAL_TASKS = 30           
-# The llm doesn't know about these fuses, and the planner never proposes more than the minimum
-# this is a mechanism to prevent the llm for generating tasks for sake of generating tasks , no given benefit in return.
+# the fuses moved to parametres.py (their explanation moved with them) -
+# one file owns every constant , and no prompt can ever see them
+from parametres import MAX_TASKS_PER_ITERATION, MAX_TOTAL_TASKS
 
 class PlannerFuseTripped(Exception):
     # raised to HALT the run and show the human. never caught silently.
@@ -406,7 +404,7 @@ def _insert_tasks(proposals, judgments, workspace):
                 real_dependency_ids.append(position_to_real_id[dependency_index])
             task.depends_on = real_dependency_ids
 
-        workspace.add_task(task)
+        workspace.add_task(task, actor="planner")
         # add_task assigned the real id; cycles are impossible here because
         # dependencies can only reference already-inserted tasks (DAG by
         # construction - this is why we need no DFS).
@@ -426,6 +424,11 @@ def _insert_tasks(proposals, judgments, workspace):
 # Checkpoint should consider stopping.
 # ---------------------------------------------------------------------------
 
+# FIX: the checkpoint distinguishes "empty frontier with a stated reason"
+# from "all proposals rejected" , but the stated reason was only printed
+# and lost . the function now returns a small dict carrying both the
+# accepted ids and the frontier-empty reason ; the empty accepted list is
+# still the stall/stop signal it always was
 def plan_next_tasks(spec, workspace):
     # every entry point re-checks ratification. cheap, and forgetting is silent.
     assert_spec_ratified(spec)
@@ -437,7 +440,7 @@ def plan_next_tasks(spec, workspace):
     if not proposals:
         # empty frontier: legitimate stop signal for the checkpoint
         print(f"[planner] empty frontier: {empty_reason}")
-        return []
+        return {"accepted_task_ids": [], "frontier_empty_reason": empty_reason}
 
     proposals = _validate_proposals(proposals, workspace)
     judgments = _judge_proposals(proposals, context)
@@ -448,6 +451,6 @@ def plan_next_tasks(spec, workspace):
         # visible in the workspace as a batch of rejected tasks with reasons
         print("[planner] all proposals rejected this iteration - possible stall")
 
-    return accepted_ids
+    return {"accepted_task_ids": accepted_ids, "frontier_empty_reason": ""}
 
 # the other iterations are planned through the orchestrator
