@@ -61,5 +61,3 @@ The full architecture, component by component, each traced to the failure mode t
 
 ---
 
-> **Xogito** — from the same root as *cogito*, "I think."
-> The difference is what happens **after** the thinking.
