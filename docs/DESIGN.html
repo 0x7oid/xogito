@@ -729,7 +729,23 @@ flowchart TB
 
 <p>Which model answers those calls is a deliberately shallow decision, confined to the one module that talks to a provider at all. The system supports several — Gemini, OpenAI, and Anthropic's Claude through its local command-line client — and the choice is either declared outright or inferred from which credentials exist, resolved lazily at the first real call so that pure-code paths like the report can be imported without any credentials at all. What makes the swap cheap is a fact about where trust already lives: providers differ in what they enforce (one validates a response schema at the API level, the others accept only a prompt and return text), but since every model output is a proposal that code validates anyway, a provider that enforces nothing changes nothing about who is trusted. For those providers the expected schema simply rides along inside the prompt, verbatim, so the model sees the exact field spec the validation code will hold it to — the check stays on this side of the boundary either way.</p>
 
-<p>Workers are also told plainly what they can't do: run code, execute benchmarks, measure systems, browse the web, or contact anyone. A task that needs one of those gets "this can't be done from here" as its honest and complete answer — an early run produced a fabricated "benchmark," invented throughput numbers included, which is exactly what this rule and its evaluator-side backstop (§9) exist to stop. Three more output rules came from the same audits: a verdict on a numeric claim states the expected magnitude, never a bare possible/impossible; factual assertions name their sources specifically enough to look up; and any conclusion built on the user's numbers shows its arithmetic.</p>
+<h3>The call cache</h3>
+
+<p>That same module owns a <strong>call cache</strong>: a flat, append-only file keyed by a hash of the model, the prompt, and the schema — the same discipline as the calibration log.</p>
+
+<ul>
+  <li><strong>Temperature-zero calls read it.</strong> Every non-voted call in the system runs deterministic, so an exact prompt asked before just returns its stored answer instead of spending a second call on the same result. That's what makes restart-after-crash cheap: kill the process and start it again, and every deterministic call already answered replays instantly from disk, so the run resumes near where it stopped instead of re-litigating settled work.</li>
+  <li><strong>Voted calls never read it.</strong> Each of the <em>N</em> self-consistency samples (§9) is drawn at a non-zero temperature precisely to be independent. Serving a cached answer back would collapse three supposedly separate opinions into one, repeated three times — exactly the failure voting exists to avoid.</li>
+  <li><strong>Voted calls still get written.</strong> Every sample is appended to the cache after it's generated, even though the run itself never reads it back, so a later replay or audit pass can see exactly what each one said.</li>
+</ul>
+
+<p>Workers are also told plainly what they can't do: run code, execute benchmarks, measure systems, browse the web, or contact anyone. A task that needs one of those gets "this can't be done from here" as its honest and complete answer — an early run produced a fabricated "benchmark," invented throughput numbers included, which is exactly what this rule and its evaluator-side backstop (§9) exist to stop. Three more output rules came from the same audits:</p>
+
+<ul>
+  <li>A verdict on a numeric claim states the expected magnitude, never a bare possible/impossible.</li>
+  <li>Factual assertions name their sources specifically enough to look up.</li>
+  <li>Any conclusion built on the user's numbers shows its arithmetic.</li>
+</ul>
 
 <p>Tools like web search and code execution haven't been built yet, but their shape is already settled: the LLM call becomes a loop of proposing, checking, and running, so a tool call is just one more kind of proposal for code to check; tool results become artifacts; and model-written code becomes evidence that's stored and can be run again later. The system can gain new abilities without changing who's trusted to do what.</p>
 </section>
@@ -788,6 +804,17 @@ flowchart RL
 
 <p>Any verdict that would <em>raise</em> confidence has to clear one more gate, the <strong>dual-pass</strong>: a second, separate LLM call sees only the claim's text and the evidence itself — never the first pass's reasoning or label — and answers one question: does this evidence actually say or logically require this claim? A second reader shown the first reader's argument tends to just agree with it, so keeping it blind is what makes the check mean something. If the two disagree, the promotion is blocked and the disagreement is logged. Demotions and contested flags skip this second check, in line with how easy it already is to lower confidence.</p>
 
+<h3>Self-consistency voting</h3>
+
+<p>That "second, separate LLM call" is really three. The blind read runs as <strong>self-consistency voting</strong> (Wang et al., <em>Self-Consistency Improves Chain of Thought Reasoning in Language Models</em>, ICLR 2023): three independent samples at a non-zero temperature, each reading the identical blind prompt and landing on its own pass/fail label. The paper's point is that one greedy read throws away the other reasoning paths a problem admits; sampling several and taking the majority recovers them instead of betting on a single path. The same voting call also gates contradiction-pair confirmation (§10) — one mechanism, two call sites, not a one-off.</p>
+
+<ul>
+  <li><strong>No tie is possible here.</strong> Both gates vote on a binary label — pass/fail, or contradiction/compatible — and the sample count is odd. Three votes can only split 2-1 or 3-0.</li>
+  <li><strong>A tie-break rule exists anyway</strong>, for label sets these two gates don't use: if the top vote count is ever shared, whichever label was sampled first among the tied wins. A fixed rule, not a per-case judgment call.</li>
+  <li><strong>A non-unanimous split isn't discarded.</strong> It's classified into a tier — unanimous, strict majority, or no clear majority — and logged to calibration (§11) as its own kind of evidence.</li>
+  <li><strong>What survives is one real answer, not a blend.</strong> Whichever sample landed on the winning label is what the caller gets back, so a reviewer's rationale always traces to something a single call actually said.</li>
+</ul>
+
 <p>Verdicts that survive all this get submitted through <code>update_belief_of_claim</code>, where the kernel checks them one more time: the evaluator checks first so one bad verdict doesn't crash the whole batch, and the workspace checks again because it doesn't automatically trust any caller. A cap on how many verdicts can be processed sits above the whole process as a last safeguard.</p>
 
 <p>Bias is handled through required fields, not through instructions. No prompt just tells the model to "be skeptical" — that kind of instruction tends to produce hedging, made-up counter-evidence, and the look of caution rather than the real thing. Instead, workers doing investigation must fill in checkable fields describing what they searched and any counter-evidence they found; <code>done_when</code> conditions are checked to make sure they don't assume an answer (phrased as "the presence or absence of X," never as if X is already true); and needing evidence from two separate tasks for <code>verified</code> means one-sided evidence structurally isn't enough on its own. Neutrality here comes from disciplined handling of information, not from asking a model to watch its own biases.</p>
@@ -844,11 +871,31 @@ flowchart TB
 
 <h3>Checkpoint</h3>
 
-<p>The checkpoint decides whether to continue, based on signals that are already available: an empty set of next tasks with a stated reason (either the success criteria are met, or the remaining uncertainty just can't be reduced further); a stall, meaning every proposal in a round got rejected, visible as a batch of rejected tasks with reasons; a buildup of <code>done_when</code> failures; or simply hitting the hard limit on rounds, a fixed constant in the code.</p>
+<p>The checkpoint decides whether to continue, based on signals that are already available:</p>
+
+<ul>
+  <li>An empty set of next tasks with a stated reason — either the success criteria are met, or the remaining uncertainty just can't be reduced further.</li>
+  <li>A stall, meaning every proposal in a round got rejected, visible as a batch of rejected tasks with reasons.</li>
+  <li>A buildup of <code>done_when</code> failures.</li>
+  <li>Simply hitting the hard limit on rounds, a fixed constant in the code.</li>
+</ul>
 
 <p>Two refinements came from watching real runs end. A round where every proposal was rejected specifically as a duplicate of covered ground counts as a finished frontier, not a stall — there was nothing new left to propose, and the judge's labels on the rejections are what let code tell the difference. And the run may not stop as a success while any item on the user's named checklist (§3) still lacks a completed covering task — with absence-type items needing two. An empty frontier that skipped a named question isn't done; it's incomplete, and the report says so, naming the dropped items.</p>
 
 <p>The checkpoint is also the one approved place where success criteria can be revised: sometimes, doing the actual work reveals that the approved criteria were subtly off, and the real question turns out to be slightly different from the one originally asked. The system can propose a revision, but only the user can approve it, through the same process used for the original specification. Letting a system quietly redefine its own goals without a human signing off is exactly how optimizing systems drift off course. Making edits mid-run to tasks or claims was set aside for later, but its design is already settled: such changes will be logged as events rather than silent edits, will go through the same checks as everything else, and the size of a change's impact will be calculated and shown before it's applied.</p>
+
+<h3>Fuses</h3>
+
+<p>A fuse is a different kind of stop than a checkpoint decision. Checkpoint asks whether the run is <em>finished</em>; a fuse asks whether the run can still be trusted to continue at all, and answers no mid-thought rather than waiting for the next natural pause. Each agent that could plausibly run away owns its own threshold, checked entirely in code, with the number never mentioned to the model that might otherwise start aiming for it:</p>
+
+<ul>
+  <li>A planner proposing more than 20 tasks in one iteration, or more than 60 across the whole run, trips <code>PlannerFuseTripped</code> — a ceiling set deliberately above the largest legitimate batch a fully-covered verification checklist can generate, after a live run once mistook thirteen obedient, checklist-driven proposals for a runaway planner and killed a diligent run for it.</li>
+  <li>A dispatch loop that runs past its twenty-minute wall-clock budget trips <code>ExecutorFuseTripped</code>.</li>
+  <li>An evaluator proposing more than 40 verdicts in one iteration trips <code>EvaluatorFuseTripped</code>.</li>
+  <li>An adjudicator resolving more than 20 contested pairs in one iteration trips <code>AdjudicatorFuseTripped</code> — the same runaway guard, applied to contradiction resolution instead of task generation.</li>
+</ul>
+
+<p>All four are caught together at the top of the orchestration loop: whichever one trips, the loop halts immediately, the exception's own message is kept as the recorded reason, and the report generation that follows is the same path a clean finish uses — never a separate, degraded one — with the halt reason attached to it. A fuse is deliberately a blunt instrument: it does not diagnose what went wrong, it only refuses to let a run that is behaving abnormally keep spending calls unsupervised.</p>
 
 <h3>Compression</h3>
 
