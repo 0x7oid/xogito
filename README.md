@@ -6,57 +6,46 @@
   <img src="docs/LOGO.png" height="400">
 </p>
 
-Ask a frontier model a hard question and it will often produce a chain of reasoning in which every individual step is competent — and the conclusion is still wrong. Worse: *confidently* wrong, with nothing in the output telling you which of its premises deserves your trust.
+Are you tired of asking a model a hard question and getting a confident answer built on a premise it never checked? Of watching a guess made in paragraph two get treated as an established fact by paragraph nine? Of long reasoning chains where every individual step looks competent and the conclusion is still wrong — with nothing in the output telling you *which* premise to distrust?
 
-Xogito exists because of what those failures have in common.
+Those are not intelligence failures. They are bookkeeping failures: the model loses track of what it believes, on what basis, and what conflicts with what. Xogito does that bookkeeping externally and mechanically, so the model can't lose track.
 
-## The problem isn't intelligence. It's bookkeeping.
+## Who this is for
 
-Inspect enough failed reasoning chains and a pattern emerges. The model rarely fails at any given step. It fails because it loses track of its own epistemic state:
+People making a decision that is expensive to get wrong, who need the reasoning to be *checkable* rather than merely persuasive:
 
-- It treats a guess made in paragraph two as an established fact by paragraph nine.
-- It resolves a contradiction between two of its own statements by silently forgetting one of them.
-- It cites its own earlier speculation as support for later speculation.
-- It cannot tell you, at the end, which conclusions rest on evidence and which rest on momentum.
+- an analyst or strategist weighing contested evidence ("should we spend this budget on a finding that might not replicate?")
+- a researcher or student who needs every conclusion traced back to the claims it actually rests on
+- an engineer who wants to see what a reasoning pipeline looks like when the LLM proposes and deterministic code disposes
 
-These are **bookkeeping failures** — failures of the machinery that should track what is believed, on what basis, with what confidence, and what conflicts with what. A human analyst with a notebook, a ledger of claims, and the discipline to never promote a hunch to a fact without writing down why will outperform a smarter colleague who keeps everything in their head.
+It is a batch reasoning tool, not a chat replacement. A run takes minutes and produces a report, not a conversation.
 
-LLMs keep everything in their head. That's the whole problem.
+## What it actually does
 
-## What Xogito does about it
+- **Separates your facts from its guesses.** Facts you declare are anchors — never reworded, never second-guessed. Anything the system had to assume is surfaced instead of silently baked in.
+- **Makes confidence expensive.** A claim starts unverified and climbs a belief ladder only with evidence, checked in code. Doubt, by contrast, is free: any claim can be contested at any time. The system's errors run toward under-confidence, never over-confidence.
+- **Detects and adjudicates contradictions** between its own findings instead of silently keeping whichever came last.
+- **Votes on judgment calls.** Label decisions are sampled multiple times and majority-decided, with the tie-break rule stated in code rather than left to chance.
+- **Stops honestly.** If no progress is being made, or a component behaves abnormally, a fuse halts the run and the report says so. "The available evidence isn't sufficient" is a valid result, not a failure state.
+- **Shows its work.** The report exhibits the reasoning — every conclusion labeled with earned confidence, every label traceable to evidence, every unresolved conflict shown with both sides. Every LLM call is also cached to disk, so an interrupted run replays instantly instead of re-paying for finished work.
 
-Xogito is that notebook — a second brain that does the model's bookkeeping *for* it, externally, explicitly, and mechanically. The model supplies the judgment; Xogito supplies the ledger, and the ledger cannot be talked out of its rules.
-
-The bet is simple: **if the bookkeeping is made external and mechanically enforced, ordinary LLM intelligence becomes sufficient for extraordinary reasoning reliability.**
-
-So the product is not answers. It is *justified, auditable conclusions*. Every claim in a Xogito report carries a confidence label that was earned through gated transitions, backed by evidence that exists and can be traced, produced by a process whose every state change was recorded. Sometimes the most honest output is *"the available evidence isn't sufficient"* — and Xogito treats that as a valid result, not a failure.
-
-## Why this is different
-
-Plenty of systems chain LLM calls together. Xogito's distinguishing rule is a strict division of labor at every boundary:
-
-> **The LLM proposes; the code disposes.**
-
-Model outputs are never allowed to directly mutate the system's state. They are always structured *proposals* — candidate tasks, candidate verdicts, candidate problem framings — and every proposal passes through deterministic validation before it can touch anything. The model holds all of the judgment and none of the authority. The code holds all of the authority and exercises no judgment.
-
-Doubt is free; confidence is expensive. A claim can be contested at any moment for nothing, but climbing from *unverified* to *verified* requires evidence, one rung at a time, checked in code. A system built this way fails safe: its errors are under-confidence (which costs efficiency), never over-confidence (which costs correctness).
-
-## How a run works
-
-1. **You describe your problem** in plain language, optionally declaring fixed facts ("the budget is $40k") that the system must never reinterpret.
-2. **Xogito formalizes it** — and asks *you* to ratify the formal framing before anything else happens. If two framings genuinely tie, it asks you to choose rather than flipping a coin behind your back.
-3. **The reasoning loop runs**: plan a few next steps, investigate them, judge what the findings actually establish, detect contradictions, repeat — until the success criteria are met, the remaining uncertainty is irreducible, or a safety fuse halts the run for human review.
-4. **You get a report** that doesn't summarize the reasoning — it *exhibits* it: every conclusion labeled with earned confidence, every label traceable to evidence, every unresolved conflict shown with both sides.
-
-## Running it
+## Usage
 
 ```bash
 pip install -r requirements.txt   # google-genai, python-dotenv, jinja2
-# put your API key in .env
+# put your Gemini API key in .env as API_KEY
 python main.py
 ```
 
-Reports are written to `reports/` as self-contained HTML.
+The intake asks four questions — only the problem statement is required. Declare your fixed facts and any reasoning rules you want followed; the run ratifies its formal framing with you before doing anything else. Reports land in `reports/` as self-contained HTML.
+
+On Windows, run with UTF-8 enabled (`PYTHONUTF8=1`) — console encodings narrower than UTF-8 can choke on model output.
+
+## The design rule everything follows
+
+> **The LLM proposes; the code disposes.**
+
+Model outputs never mutate state directly. They are structured proposals — candidate tasks, candidate verdicts, candidate framings — and every one passes deterministic validation before it touches anything. The model holds all of the judgment and none of the authority.
 
 ## Repository overview
 
