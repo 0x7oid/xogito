@@ -6,24 +6,28 @@
   <img src="docs/LOGO.png" height="400">
 </p>
 
-Ask a language model a hard question and you get a fluent answer. Whether you can trust it is another story. A citation might not exist. A guess made early in the reasoning quietly becomes the foundation of the conclusion. When real money or a real decision rides on the answer, "it sounds right" is not enough.
+LLMs are unreliable on hard questions because they treat reasoning as transient text. A premise assumed in one paragraph is indistinguishable, three paragraphs later, from a fact that was established. Nothing in the output records what rests on what, so errors compound silently and the final answer arrives with uniform confidence regardless of what's underneath it.
 
-Xogito treats the question as an investigation instead. It breaks the problem down, checks the claims, keeps score of what actually has evidence behind it, and ends with a report where you can see why each conclusion deserves your trust, and which ones don't yet.
+Xogito makes that reasoning state explicit and external. A run maintains a ledger the model cannot bypass: every claim is recorded individually, linked to the evidence produced for it, and assigned a belief state that changes only through transitions the code enforces. The model supplies judgment. The ledger decides what that judgment is allowed to establish.
 
-## The problems it's built for
+## The mechanism, briefly
 
-- Spending decisions that rest on disputed evidence. "The classic study says do A, a recent paper says the effect isn't real, industry practice says B. Where do we put the budget?"
-- Choosing between options when every source you read contradicts the last one.
-- Checking whether a widely repeated "best practice" or statistic is actually backed by anything before you build on it.
-- Any conclusion you will have to defend in front of a boss, a client, or a committee, where "the AI said so" won't fly.
+A run starts by turning your question into a ratified problem specification. Facts you declare are **contextual anchors**, carried verbatim and never reinterpreted; anything the system must assume is surfaced to you as an assumption before work begins, so guesses can't hide inside the framing.
 
-Quick lookups, brainstorming and writing tasks are not what this is for. A run takes minutes and ends in a report.
+The investigation loop then generates claims, and every claim climbs a **belief ladder**: it enters as unverified and gains standing only when linked evidence justifies the promotion, with each transition validated in code rather than asserted by the model. When two claims can't both be true, contradiction detection marks the pair **contested** and routes it to **adjudication** — the conflict is resolved with a recorded rationale or kept open, never silently dropped in favor of whichever claim came last.
 
-## What you get
+One invariant holds throughout: model output never mutates state directly. Everything a model produces is a proposal that passes deterministic validation before it touches the ledger.
 
-A report, not a chat transcript. The recommendation comes first, in plain language. Behind it, every supporting claim is labeled by how well it survived checking, and disagreements in the evidence are shown side by side instead of smoothed over. Facts you declared at the start are kept word for word. Guesses the system had to make are shown to you before the run starts, not discovered after.
+The report is a projection of that ledger. Every conclusion links back to the claims that support it. Every claim links to its evidence. Assumptions remain visibly separate from established facts. If independent evidence conflicts, both positions appear in the report instead of being merged into one confident answer. And when the evidence doesn't suffice, the report states that plainly — an unsupported conclusion is the exact failure the system exists to prevent, so it is never manufactured to fill the space.
 
-When the evidence isn't sufficient, the report says exactly that. An honest "this couldn't be established" is treated as a valid result, because a confident answer built on nothing is the failure the whole tool exists to prevent.
+## When a five-minute run is worth it
+
+- A literature review or scientific synthesis where sources genuinely disagree and the disagreement is the point.
+- Due diligence: checking whether a widely repeated statistic, "best practice," or vendor claim is actually backed by anything before building on it.
+- A policy or spending recommendation that will be defended in front of a committee, where the reasoning needs an audit trail rather than a persuasive summary.
+- Any decision where a wrong answer is expensive and "the model sounded sure" won't survive scrutiny.
+
+A chat can't serve these cases, because a conversation loses its own structure as it scrolls: assumptions blend into conclusions, dropped threads disappear, and nothing preserves which statement rested on which source. The report format exists to keep assumptions, evidence, provenance, and unresolved disputes intact after the run ends.
 
 ## Usage
 
@@ -39,7 +43,7 @@ On Windows, run with UTF-8 enabled (`PYTHONUTF8=1`).
 
 ## Learn more
 
-How it works under the hood, and why each piece exists:
+The full architecture, component by component, each traced to the failure mode that demanded it:
 
 **→ [docs/DESIGN.html](docs/DESIGN.html)** — *Xogito: The Architecture of Auditable Reasoning*
 
