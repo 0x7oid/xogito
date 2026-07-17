@@ -22,17 +22,33 @@ they call , nothing more .
 '''
 
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
-from google.genai import errors as genai_errors
 import hashlib
 import json
 import os
+import shutil
+import subprocess
 import time
+
+try:
+    from google import genai
+    from google.genai import types
+    from google.genai import errors as genai_errors
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
+try:
+    from openai import OpenAI as OpenAIClient
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 from parametres import (
     CALL_TIMEOUT_SECONDS,   # moved to parametres.py - constants live in code , in one place
+    CLAUDE_CALL_TIMEOUT_SECONDS,
+    CLAUDE_MODEL,
     DEFAULT_MODEL,
+    OPENAI_MODEL,
     LLM_CACHE_PATH,
     VOTING_TEMPERATURE,
     TRANSPORT_RETRIES,
@@ -77,6 +93,13 @@ def _server_retry_delay_seconds(error):
 
 load_dotenv()
 API_KEY = os.getenv("API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# PROVIDER SELECTION : an explicit LLM_PROVIDER in .env always wins .
+# otherwise gemini is preferred when its key exists , openai is the
+# fallback . claude is explicit-only : it depends on the local claude
+# CLI being installed and logged in , which code cannot verify cheaply
+LLM_PROVIDER = (os.getenv("LLM_PROVIDER") or "").strip().lower()
 
 # FIX: the client used to be created at import time , so a missing api
 # key crashed EVERY import of every module that transitively touches this
@@ -84,13 +107,80 @@ API_KEY = os.getenv("API_KEY")
 # an llm . creation is now lazy : the failure still raises loudly , but
 # at the first actual call , where it belongs
 _client = None
+_openai_client = None
+_provider = None
+_claude_cli_path = None
+
+
+def _get_provider():
+    global _provider
+    if _provider is None:
+        if LLM_PROVIDER in ("gemini", "openai", "claude"):
+            _provider = LLM_PROVIDER
+        elif API_KEY and GEMINI_AVAILABLE:
+            _provider = "gemini"
+        elif OPENAI_API_KEY and OPENAI_AVAILABLE:
+            _provider = "openai"
+        else:
+            raise ValueError(
+                "No LLM provider configured. Set API_KEY (Gemini) or "
+                "OPENAI_API_KEY (OpenAI) in .env, or LLM_PROVIDER=claude "
+                "with a logged-in claude CLI")
+        print(f"[client] provider: {_provider}")
+    return _provider
+
+
+def _default_model():
+    # the real default is per provider - a model name only exists on its
+    # own api , so resolving it any earlier than call time would bake the
+    # wrong provider's name into calls and cache keys
+    provider = _get_provider()
+    if provider == "claude":
+        return CLAUDE_MODEL
+    if provider == "openai":
+        return OPENAI_MODEL
+    return DEFAULT_MODEL
 
 
 def _get_client():
     global _client
     if _client is None:
+        if not GEMINI_AVAILABLE:
+            raise ImportError("google-genai package not installed")
+        if not API_KEY:
+            raise ValueError("API_KEY not set in .env")
         _client = genai.Client(api_key=API_KEY)
     return _client
+
+
+def _get_openai_client():
+    global _openai_client
+    if _openai_client is None:
+        if not OPENAI_AVAILABLE:
+            raise ImportError("openai package not installed (pip install openai)")
+        if not OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY not set in .env")
+        _openai_client = OpenAIClient(api_key=OPENAI_API_KEY)
+    return _openai_client
+
+
+def _get_claude_cli():
+    # the claude CLI , wherever it lives . which() first ; the windows
+    # default install path as the fallback (the cli is often not on the
+    # PATH of whatever shell launched python)
+    global _claude_cli_path
+    if _claude_cli_path is None:
+        found = shutil.which("claude")
+        if found is None:
+            candidate = os.path.expanduser("~/.local/bin/claude.exe")
+            if os.path.exists(candidate):
+                found = candidate
+        if found is None:
+            raise FileNotFoundError(
+                "LLM_PROVIDER=claude but the claude CLI was not found - "
+                "install Claude Code or fix PATH")
+        _claude_cli_path = found
+    return _claude_cli_path
 
 
 # ===========================================================================
@@ -139,7 +229,115 @@ def _append_to_cache(key, response_text):
 # the single call
 # ===========================================================================
 
-def ask_llm(prompt, schema, model=DEFAULT_MODEL, temperature=0):
+def _strip_markdown_fences(text):
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[7:]
+    if text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    return text.strip()
+
+
+def _schema_in_prompt(prompt, schema):
+    # for providers that enforce no response schema at the api level ,
+    # the schema rides in the prompt verbatim : the model sees the exact
+    # field spec the downstream json.loads/validation code expects
+    if not schema:
+        return prompt
+    return (
+        prompt
+        + "\n\nRespond with a single JSON object (no markdown fences, "
+          "no commentary) that conforms exactly to this JSON Schema - "
+          "every 'required' field must be present:\n"
+        + json.dumps(schema)
+    )
+
+
+def _gemini_call(prompt, schema, model, temperature):
+    response = _get_client().models.generate_content(
+        model=model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=schema,
+            temperature=temperature,
+            # FIX: the old code passed timeout= directly to
+            # GenerateContentConfig , which has no such field . the real
+            # knob is http_options.timeout , in MILLISECONDS - this is the
+            # native timeout that makes the executor's thread-pool
+            # timeout wrapper unnecessary
+            http_options=types.HttpOptions(timeout=CALL_TIMEOUT_SECONDS * 1000),
+        )
+    )
+    return response.text
+
+
+def _openai_call(prompt, schema, model, temperature):
+    # json_object mode does not enforce the schema server-side , so the
+    # schema is appended to the prompt - which also satisfies the api's
+    # requirement that the prompt mention json when that mode is on
+    kwargs = {
+        "model": model,
+        "messages": [{"role": "user", "content": _schema_in_prompt(prompt, schema)}],
+        "temperature": temperature,
+        "timeout": CALL_TIMEOUT_SECONDS,
+    }
+    if schema:
+        kwargs["response_format"] = {"type": "json_object"}
+    response = _get_openai_client().chat.completions.create(**kwargs)
+    return _strip_markdown_fences(response.choices[0].message.content)
+
+
+def _claude_env():
+    # the subprocess must NOT inherit api-routing overrides from whatever
+    # environment launched python (a hosting harness may set
+    # ANTHROPIC_BASE_URL / ANTHROPIC_API_KEY , which would silently
+    # redirect the cli away from the user's subscription login)
+    env = dict(os.environ)
+    env.pop("ANTHROPIC_BASE_URL", None)
+    env.pop("ANTHROPIC_API_KEY", None)
+    return env
+
+
+def _claude_call(prompt, schema, model, temperature):
+    # headless claude cli : prompt on stdin , plain text out , the same
+    # schema-in-prompt discipline as openai (the cli enforces no schema) .
+    # temperature is not a cli knob - voting still works because cli
+    # sampling is non-deterministic by default . no --allowedTools : a
+    # pure generation call stays a pure generation call
+    result = subprocess.run(
+        [_get_claude_cli(), "-p", "--model", model, "--output-format", "text"],
+        input=_schema_in_prompt(prompt, schema),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=CLAUDE_CALL_TIMEOUT_SECONDS,
+        env=_claude_env(),
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"claude cli exited {result.returncode}: "
+            f"{(result.stderr or result.stdout or '').strip()[:300]}")
+    text = _strip_markdown_fences(result.stdout or "")
+    if not text:
+        raise RuntimeError("claude cli returned empty output")
+    return text
+
+
+_PROVIDER_CALLS = {
+    "gemini": _gemini_call,
+    "openai": _openai_call,
+    "claude": _claude_call,
+}
+
+
+def ask_llm(prompt, schema, model=None, temperature=0):
+    provider = _get_provider()
+    if model is None:
+        model = _default_model()
+
     _load_cache()
     key = _cache_key(model, prompt, schema)
 
@@ -157,28 +355,22 @@ def ask_llm(prompt, schema, model=DEFAULT_MODEL, temperature=0):
     last_error = None
     for attempt in range(1, TRANSPORT_RETRIES + 1):
         try:
-            response = _get_client().models.generate_content(
-                model=model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=schema,
-                    temperature=temperature,
-                    # FIX: the old code passed timeout= directly to
-                    # GenerateContentConfig , which has no such field . the real
-                    # knob is http_options.timeout , in MILLISECONDS - this is the
-                    # native timeout that makes the executor's thread-pool
-                    # timeout wrapper unnecessary
-                    http_options=types.HttpOptions(timeout=CALL_TIMEOUT_SECONDS * 1000),
-                )
-            )
-            _append_to_cache(key, response.text)
-            return response.text
-        except genai_errors.APIError as error:
-            if error.code not in RETRYABLE_STATUS_CODES:
+            response_text = _PROVIDER_CALLS[provider](prompt, schema, model,
+                                                      temperature)
+            _append_to_cache(key, response_text)
+            return response_text
+        except Exception as error:
+            # status code lives at .code on genai errors and .status_code
+            # on openai errors ; a claude cli failure carries neither and
+            # raises immediately - a bad exit will not get better by
+            # asking again
+            status_code = getattr(error, "code", None)
+            if status_code is None:
+                status_code = getattr(error, "status_code", None)
+            if status_code not in RETRYABLE_STATUS_CODES:
                 raise
             last_error = error
-            print(f"[client] transient {error.code} from the api "
+            print(f"[client] transient {status_code} from the api "
                   f"(attempt {attempt}/{TRANSPORT_RETRIES}) - backing off")
             if attempt < TRANSPORT_RETRIES:
                 # exponential backoff , capped : 3s, 9s, 27s, 60s, 60s -
@@ -203,7 +395,7 @@ def ask_llm(prompt, schema, model=DEFAULT_MODEL, temperature=0):
 # tier - no arithmetic ever leaves this file
 # ===========================================================================
 
-def ask_llm_voted(prompt, schema, extract_label_fn, n, model=DEFAULT_MODEL):
+def ask_llm_voted(prompt, schema, extract_label_fn, n, model=None):
     responses = []
     labels = []
     for _sample_index in range(n):

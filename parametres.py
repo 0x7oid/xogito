@@ -47,7 +47,13 @@ EVIDENCE_TYPE_ORDER = {"testimonial": 0, "empirical": 1, "deductive": 2}
 # a run that finishes beats a smarter run that cannot
 DEFAULT_MODEL = "gemini-3.1-flash-lite"
 
+# per-provider defaults . a model name only exists on its own api , so
+# the active provider picks which of these applies at call time
+CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+OPENAI_MODEL = "gpt-4o-mini"
+
 CALL_TIMEOUT_SECONDS = 300
+CLAUDE_CALL_TIMEOUT_SECONDS = 600   # cli round-trips are slower than raw api
 
 # self-consistency voting (Wang et al. 2023) : how many samples per voted
 # judgment , and the sampling temperature . votes are on LABELS only ,
