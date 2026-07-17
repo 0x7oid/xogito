@@ -45,9 +45,12 @@ pip install -r requirements.txt   # google-genai, python-dotenv, jinja2
 python main.py
 ```
 
-- **API key** — put your Gemini key in `.env` as `API_KEY`.
-- **Model** — set in `parametres.py` as `DEFAULT_MODEL` (default: `gemini-3.1-flash-lite`). A stronger model raises the quality of judgment-heavy steps at higher cost.
-- **Call timeout** — `CALL_TIMEOUT_SECONDS` in `parametres.py`, for slow connections or long generations.
+- **Provider** — set `LLM_PROVIDER` in `.env` to `gemini`, `openai`, or `claude`. If unset, Gemini is used when its key is present, OpenAI otherwise.
+  - `gemini` — put your key in `.env` as `API_KEY`.
+  - `openai` — put your key in `.env` as `OPENAI_API_KEY`, and `pip install openai`.
+  - `claude` — no key needed; uses your locally installed, logged-in [Claude Code](https://claude.com/claude-code) CLI, so runs bill your subscription instead of an API account.
+- **Models** — per provider in `parametres.py`: `DEFAULT_MODEL` (Gemini), `OPENAI_MODEL`, `CLAUDE_MODEL`. A stronger model raises the quality of judgment-heavy steps at higher cost.
+- **Call timeout** — `CALL_TIMEOUT_SECONDS` in `parametres.py` (`CLAUDE_CALL_TIMEOUT_SECONDS` for the CLI, whose round-trips are slower).
 - **Windows** — run with UTF-8 enabled (`PYTHONUTF8=1`); console encodings narrower than UTF-8 can choke on model output.
 
 ## Learn more
