@@ -8,17 +8,7 @@
 
 LLMs are unreliable on hard questions because they treat reasoning as transient text. A premise assumed in one paragraph is indistinguishable, three paragraphs later, from a fact that was established. Nothing in the output records what rests on what, so errors compound silently and the final answer arrives with uniform confidence regardless of what's underneath it.
 
-Xogito makes that reasoning state explicit and external. A run maintains a ledger the model cannot bypass: every claim is recorded individually, linked to the evidence produced for it, and assigned a belief state that changes only through transitions the code enforces. The model supplies judgment. The ledger decides what that judgment is allowed to establish.
-
-## The mechanism, briefly
-
-A run starts by turning your question into a ratified problem specification. Facts you declare are **contextual anchors**, carried verbatim and never reinterpreted; anything the system must assume is surfaced to you as an assumption before work begins, so guesses can't hide inside the framing.
-
-The investigation loop generates claims. Every claim enters the ledger separately, as unverified. It gains standing on the **belief ladder** only when supporting evidence justifies a promotion, and those promotions are validated by deterministic code rather than the language model. When two claims can't both be true, the pair is marked **contested** and sent to **adjudication**: the conflict is resolved with a recorded rationale, or kept open. It is never silently dropped in favor of whichever claim came last.
-
-One invariant holds throughout: model output never mutates state directly. Everything a model produces is a proposal that passes deterministic validation before it touches the ledger.
-
-The report is a projection of that ledger. Every conclusion links back to the claims that support it. Every claim links to its evidence. Assumptions remain visibly separate from established facts. If independent evidence conflicts, both positions appear in the report instead of being merged into one confident answer. And when the evidence doesn't suffice, the report states that plainly — an unsupported conclusion is the exact failure the system exists to prevent, so it is never manufactured to fill the space.
+Xogito makes that reasoning state explicit and external. A run maintains a ledger the model cannot bypass: every claim is recorded individually, linked to the evidence produced for it, and assigned a belief state that changes only through transitions the code enforces. The model supplies judgment. The ledger decides what that judgment is allowed to establish. The machinery behind this — contextual anchors, the belief ladder, contested claims and adjudication — is laid out in the [design document](docs/DESIGN.html).
 
 ## Problem classes
 
@@ -35,17 +25,30 @@ The common shape: a decision that needs an auditable chain of reasoning, not a p
 
 A chat can't serve these cases, because a conversation loses its own structure as it scrolls: assumptions blend into conclusions, dropped threads disappear, and nothing preserves which statement rested on which source. The report format exists to keep assumptions, evidence, provenance, and unresolved disputes intact after the run ends.
 
-## Usage
+## What a run looks like
+
+Expect a dialogue before the work starts. The intake asks for four things, in plain language:
+
+1. **Your problem** — what you want figured out or decided. The only required field.
+2. **Scope** — what to include and what to leave out ("open-source options only", "ignore cost").
+3. **Fixed facts** — things that are simply true for you, taken as given and never second-guessed ("budget is $2M", "the deadline is March").
+4. **Reasoning rules** — how you want disagreements settled ("prefer recent sources", "official statistics beat blog posts").
+
+Xogito then shows you the guesses it had to make about your situation and asks you to confirm, correct, or hand each one over for investigation. Once you ratify the framing, it works on its own and writes the report to `reports/` as self-contained HTML.
+
+Runs are not instant. Depending on the question and the model, expect minutes to tens of minutes. Every model call is cached to disk, so an interrupted run replays its finished work instantly on restart instead of paying for it twice.
+
+## Setup
 
 ```bash
 pip install -r requirements.txt   # google-genai, python-dotenv, jinja2
-# put your Gemini API key in .env as API_KEY
 python main.py
 ```
 
-The intake asks four questions and only the problem statement is required. Reports land in `reports/` as self-contained HTML.
-
-On Windows, run with UTF-8 enabled (`PYTHONUTF8=1`).
+- **API key** — put your Gemini key in `.env` as `API_KEY`.
+- **Model** — set in `parametres.py` as `DEFAULT_MODEL` (default: `gemini-3.1-flash-lite`). A stronger model raises the quality of judgment-heavy steps at higher cost.
+- **Call timeout** — `CALL_TIMEOUT_SECONDS` in `parametres.py`, for slow connections or long generations.
+- **Windows** — run with UTF-8 enabled (`PYTHONUTF8=1`); console encodings narrower than UTF-8 can choke on model output.
 
 ## Learn more
 
