@@ -749,6 +749,14 @@ def _detect_contradictions(belief_table):
     # into ask_llm_voted later by voting per-pair on "contradiction /
     # not-contradiction" labels - the swap happens HERE and only here
     result = json.loads(ask_llm(prompt, CONTRADICTION_SCHEMA))
+    if "pairs" not in result:
+        # a provider with no api-level schema enforcement can return a
+        # malformed response here - that must not crash the whole run .
+        # missing a contradiction just leaves it unresolved , which is
+        # recoverable ; a hard crash loses the iteration's completed work
+        print(f"[contradiction_detector] response missing 'pairs' key - "
+              f"treating as no contradictions found: {result!r}")
+        return []
     return result["pairs"]
 
 
