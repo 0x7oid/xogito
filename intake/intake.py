@@ -45,7 +45,7 @@ from pydantic import BaseModel, Field, field_validator
 # Framework constants - protected, not user input
 # ---------------------------------------------------------------------------
 
-MAX_ITERATIONS: Final[int] = 5  # kernel-owned; never exposed to intake
+MAX_ITERATIONS: Final[int] = 2  # kernel-owned; never exposed to intake
 
 
 # ---------------------------------------------------------------------------

@@ -200,4 +200,4 @@ INVESTIGATE_FANOUT_THRESHOLD = None   # disabled on purpose
 # agents/checkpoint.py
 # ===========================================================================
 
-MAX_ITERATIONS = 10   # hard budget fuse on the plan->execute->evaluate loop
+MAX_ITERATIONS = 2   # hard budget fuse on the plan->execute->evaluate loop
