@@ -14,18 +14,24 @@ Xogito makes that reasoning state explicit and external. A run maintains a ledge
 
 A run starts by turning your question into a ratified problem specification. Facts you declare are **contextual anchors**, carried verbatim and never reinterpreted; anything the system must assume is surfaced to you as an assumption before work begins, so guesses can't hide inside the framing.
 
-The investigation loop then generates claims, and every claim climbs a **belief ladder**: it enters as unverified and gains standing only when linked evidence justifies the promotion, with each transition validated in code rather than asserted by the model. When two claims can't both be true, contradiction detection marks the pair **contested** and routes it to **adjudication** — the conflict is resolved with a recorded rationale or kept open, never silently dropped in favor of whichever claim came last.
+The investigation loop generates claims. Every claim enters the ledger separately, as unverified. It gains standing on the **belief ladder** only when supporting evidence justifies a promotion, and those promotions are validated by deterministic code rather than the language model. When two claims can't both be true, the pair is marked **contested** and sent to **adjudication**: the conflict is resolved with a recorded rationale, or kept open. It is never silently dropped in favor of whichever claim came last.
 
 One invariant holds throughout: model output never mutates state directly. Everything a model produces is a proposal that passes deterministic validation before it touches the ledger.
 
 The report is a projection of that ledger. Every conclusion links back to the claims that support it. Every claim links to its evidence. Assumptions remain visibly separate from established facts. If independent evidence conflicts, both positions appear in the report instead of being merged into one confident answer. And when the evidence doesn't suffice, the report states that plainly — an unsupported conclusion is the exact failure the system exists to prevent, so it is never manufactured to fill the space.
 
-## When a five-minute run is worth it
+## Problem classes
 
-- A literature review or scientific synthesis where sources genuinely disagree and the disagreement is the point.
-- Due diligence: checking whether a widely repeated statistic, "best practice," or vendor claim is actually backed by anything before building on it.
-- A policy or spending recommendation that will be defended in front of a committee, where the reasoning needs an audit trail rather than a persuasive summary.
-- Any decision where a wrong answer is expensive and "the model sounded sure" won't survive scrutiny.
+- Literature review and evidence synthesis, where sources genuinely disagree and the disagreement is the point
+- Due diligence and fact verification: whether a repeated statistic, "best practice," or vendor claim is actually backed by anything
+- Policy and strategy recommendations that will be defended in front of a committee
+- Risk and compliance assessments that need a traceable basis for each finding
+- Technology, vendor, or procurement evaluations where the marketing outruns the evidence
+- Root-cause investigations, where the tempting explanation and the supported one often differ
+- Scientific and technical research questions with contested or partial evidence
+- Legal or regulatory analysis, as preparation for human review rather than a substitute for it
+
+The common shape: a decision that needs an auditable chain of reasoning, not a persuasive answer.
 
 A chat can't serve these cases, because a conversation loses its own structure as it scrolls: assumptions blend into conclusions, dropped threads disappear, and nothing preserves which statement rested on which source. The report format exists to keep assumptions, evidence, provenance, and unresolved disputes intact after the run ends.
 
