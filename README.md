@@ -8,7 +8,7 @@
 
 LLMs are unreliable on hard questions because they treat reasoning as transient text. A premise assumed in one paragraph is indistinguishable, three paragraphs later, from a fact that was established. Nothing in the output records what rests on what, so errors compound silently and the final answer arrives with uniform confidence regardless of what's underneath it.
 
-Xogito makes that reasoning state explicit and external. A run maintains a ledger the model cannot bypass: every claim is recorded individually, linked to the evidence produced for it, and assigned a belief state that changes only through transitions the code enforces. The model supplies judgment. The ledger decides what that judgment is allowed to establish. The machinery behind this — contextual anchors, the belief ladder, contested claims and adjudication — is laid out in the [design document](docs/DESIGN.html).
+Xogito is a multi-agent system which makes that reasoning state explicit and external. A run maintains a ledger the model cannot bypass: every claim is recorded individually, linked to the evidence produced for it, and assigned a belief state that changes only through transitions the code enforces. The model supplies judgment. The ledger decides what that judgment is allowed to establish. The machinery behind this — contextual anchors, the belief ladder, contested claims and adjudication — is laid out in the [design document](docs/DESIGN.html).
 
 ## Problem classes
 
