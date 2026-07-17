@@ -801,8 +801,6 @@ flowchart RL
 
 <p>After verdicts are applied, the evaluator scans the entire belief table with one narrow question: which pairs of claims can't both be true? Its prompt warns against the usual false alarms — different emphasis, different scope, and paraphrasing are not contradictions — and it's told that finding nothing is a perfectly fine answer. Code then checks the pairs it finds, and both claims in each genuine pair are moved to <code>contested</code> through that single approved gateway, each carrying a note naming the other, so the whole conflict can be reconstructed later just from the provenance log.</p>
 
-<p>The sweep's reply is itself model output, and on a provider that enforces no response schema it can come back missing the very field the code reads. That malformed reply is logged loudly and treated as a sweep that found nothing — a deliberate asymmetry in what each failure costs. A contradiction missed this round is still sitting in the belief table next round, where the sweep reads the whole table again; a crash here would throw away every task the iteration already completed. Between a recoverable miss and an unrecoverable loss, the code picks the miss and says so.</p>
-
 <p>The evaluator only detects contradictions; it never resolves them. A component that both detects and resolves has an incentive to under-detect, since every conflict it finds becomes work it then has to settle — and a judge that found the conflict already arrives with an opinion about it. Resolving it is left to a separate component, the <strong>adjudicator</strong>.</p>
 
 <figure class="diagram">
